@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬S.3`or¬Print`option will display a menu of the available print
+`      dialogs used for printing data sets.  See that tutorial for more
+`      information on printing the selected data set.
+`
+`      The¬S.4`or¬Rename`option will allow you to rename the selected data set.
+`
+`      The¬S.5`or¬Copy`option will allow you to copy the selected data set to
+`      another data set.  If the data set does not exist then it can be
+`      allocated.
+`
+%      Notes:
+`     ¬S.3`may also be specified as:¬PR`or¬PRIN`or¬PRNT`or¬PRT
+`     ¬S.4`may also be specified as:¬RN`or¬REN`or¬RENA`or¬RENM
+`     ¬S.5`may also be specified as:¬CO`or¬COP`or¬COPY`or¬CPY
+)End

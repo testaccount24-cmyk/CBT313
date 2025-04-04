@@ -1,0 +1,27 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬LOG`command will enter the LOG dialog in which you can review,
+`      create and process multiple log data sets.
+`
+`      A LOG is a data set, similar to the TSO/E Mail data set, in which you
+`      can log messages that are related.  It can also be used as a message
+`      archive facility.
+`
+`      Message selection option¬L`is used to request that a message be
+`      logged.
+`
+`      Optionally, by specifying a message selection option of Ln, where n is
+`      the number of the log data set, you can perform the logging task
+`      faster.
+)End

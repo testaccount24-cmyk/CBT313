@@ -1,0 +1,34 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++--------------------------% TSO/E-Mail Processing +----------------------------
+%Command ===>_zcmd
+%
+`
+`    TSO Mail Processing is an extension to the standard IBM provided TSO
+`    Transmit and Receive commands that provides full screen ISPF dialog
+`    support for sending and receiving messages and files.
+`
+`    With this ISPF Dialog you have the ability to¬Open Mail`which will
+`    receive all new messages and store the messages into an ISPF table.
+`    It will also receive any data sets that have been sent to you and
+`    store them as unique data sets pending further action by you.
+`
+`    The¬Send Mail`option simplifies the task of sending messages to
+`    another user, either at the current NJE Node or at another location.
+`
+`
+`    The following tutorial will be displayed only if selected:
+`
+¦      1 -¬Full Tutorial
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 1,*tmailhlp *,?)
+)End

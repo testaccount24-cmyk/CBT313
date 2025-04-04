@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   + type(text  ) intens(low ) skip(on)
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ! type( input) intens(high) caps(off) just(asis ) color(white)
+   ` type( input) intens(high) caps(off) just(asis ) color(turq)
+         hilite(uscore) pad('')
+   ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+         hilite(uscore) pad('')
+)Body
++--------------------------% TSO Mail Control Table +---------------------------
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+%
++Command: %I+-Insert   %Cancel+-Cancel the update   %Save+-Save/Update
++Line:    %I+-Insert   %D+-Delete   %U+-Update current record (in place)
+%
+%Sel  %Option / Value
+)Model
+@z   +!z
++     `z
+)Init
+  .ZVARS = '(ZSEL Option Value)'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+   If (&zsel ¬= &z)
+    Ver (&option,nb,list,:Altctl.,:Prolog.,:Epilog.,:Logsel.,:Logname.)
+)End

@@ -1,0 +1,60 @@
+)attr default(%+_)
+  ` type(input) intens(high)  caps(off) just(right) color(yellow)
+    pad('_')
+  $ type(input) intens(high)  caps(off) just(left) color(yellow)
+  ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+  % type(text) intens(high)
+  @ type(output) just(left) caps(off) color(turq)
+)Body Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker+@ver% -\-\-
++Command ===>_zcmd
++
+~   Enter/Verify the following:
++
+~   Personal Dictionary DSN%===>_usrdict                                     +
++
+~   Verify or Change:
+~   Checking lines%===>`start ~to%===>`stop  +
++
+~   Display Progress PopUp  %===>$z  ~Yes or No
+~   Ignore words in all CAPS%===>$z  ~Yes or No
++
+~   Words Public Dictionary:$public  +
++
+   ~Please forward your list of updated words to:
+   @email
++
+   ~Press%Enter~to continue or%PF3~to cancel.
+)Init
+ .ZVARS = '(spellpg chkcaps)'
+ .help = spellch
+  /* ZENVIR format  ISPF 5.0MVS     TSO */
+  /* get the number i.e. 50             */
+  &ISPFVER1 = TRUNC (&ZENVIR,' ')
+  &ISPFVER1 = .TRAIL
+  &ISPFVER1 = TRUNC (&ISPFVER1,'.')
+  &ISPFVER2 = .TRAIL
+  &ISPFVER2 = TRUNC (&ISPFVER2,1  )
+  &ISPFVER  = '&ISPFVER1&ISPFVER2'
+  &spellpg = trans(trunc(&spellpg,1) y,Yes n,&z Y,Yes N,No &z,No)
+  &chkcaps = trans(trunc(&chkcaps,1) y,Yes n,&z Y,Yes N,No &z,No)
+)Proc
+ IF (&ISPFVER < 44      )
+   &DSN = &usrdict
+   IF (&DSN   NE ' ')                   /* IF DSN IS SPECIFIED      */
+      &ZFC = TRUNC(&DSN,1)              /* IF FIRST CHARACTER       */
+      IF (&ZFC = '''')                  /*  OF DSN IS "'" CHECK     */
+        &ZREM = .TRAIL                  /*  TO SEE IF LAST "'"      */
+        &ZREM2 = TRUNC(&ZREM,'''')      /*  IS MISSING.             */
+        IF (&ZREM2 = &ZREM)             /*  IF LAST "'" MISSING     */
+          &DSN = '&DSN&ZFC'             /*    ADD IT TO THE END     */
+          &usrdict = &DSN
+   ver (&usrdict,dsname)
+ ELSE
+   ver (&usrdict,dsnameq)
+ &spellpg = trans(trunc(&spellpg,1) y,Yes Y,Yes n,No N,No *,*)
+ ver (&spellpg,list,Yes,No,&z)
+ &chkcaps = trans(trunc(&chkcaps,1) y,Yes Y,Yes n,No N,No *,*)
+ ver (&chkcaps,list,Yes,No,&z)
+ Vput (usrdict spellpg chkcaps) Profile
+)End

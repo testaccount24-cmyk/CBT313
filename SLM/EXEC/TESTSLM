@@ -1,0 +1,64 @@
+        /* rexx */
+        arg options
+
+        /* -------------------------------------------------------- *
+         * Dynamically determine the HLQ of the active EXEC library *
+         * where this exec is called from and set the HLQ for the   *
+         * other libraries based on that.                           *
+         * -------------------------------------------------------- */
+         if options = "" then do
+         parse source with src_calltype src_ucname src_ddname src_dsn .
+         parse value src_dsn with hlq".EXEC"
+         options = hlq
+         end
+         else hlq = options
+
+        /* ----------------------------------------------------- *
+         * Test for the SLME ISPF Application ID and if not then *
+         * recurse using that ISPF Applid after ALTLIB for exec  *
+         * ----------------------------------------------------- */
+         Address ISPEXEC "VGET ZAPPLID"
+          if zapplid <> "SLME" then do
+            "Altlib Activate Application(exec) dataset('"hlq".exec')"
+             Address ISPEXEC
+             "Select CMD(%testslm" options") Newappl(SLME) passlib"
+             Address TSO
+             "Altlib Deactivate Application(exec)"
+             Exit 0
+             end
+
+        /* ------------------------------------------------------- *
+         * Now LIBDEF the ISPF Load, Messages, and Panel libraries *
+         * and Select the command. LIBDEF to free upon return.     *
+         * ------------------------------------------------------- */
+         Address ISPExec
+         "Libdef ISPLLIB dataset id('"hlq".load') stack"
+         "Libdef ISPMLIB dataset id('"hlq".msgs') stack"
+         "Libdef ISPPLIB dataset id('"hlq".panels') stack"
+         "Select cmd(%slm" options")"
+         "Libdef ISPLLIB"
+         "Libdef ISPMLIB"
+         "Libdef ISPPLIB"
+         Exit 0
+        /*  Part of the SLM Package                                   *
+         *                                                            *
+         *  Copyright (C) 2002, Lionel B. Dyck                        *
+         *                                                            *
+         *  This program is free software; you can redistribute it    *
+         *  and/or modify it under the terms of the GNU General Public*
+         *  License as published by the Free Software Foundation;     *
+         *  either version 2 of the License, or (at your option) any  *
+         *  later version.                                            *
+         *                                                            *
+         *  This program is distributed in the hope that it will be   *
+         *  useful, but WITHOUT ANY WARRANTY; without even the implied*
+         *  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR   *
+         *  PURPOSE.  See the GNU General Public License for more     *
+         *  details.                                                  *
+         *                                                            *
+         *  You should have received a copy of the GNU General Public *
+         *  License along with this program; if not, write to the Free*
+         *  Software Foundation, Inc., 59 Temple Place - Suite 330,   *
+         *  Boston, MA  02111-1307,                                   *
+         *                                                            *
+         * ---------------------------------------------------------- */

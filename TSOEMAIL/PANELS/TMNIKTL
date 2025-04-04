@@ -1,0 +1,26 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++---------------------------% TSO Nick Name Table +-----------------------------
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+%
++Command: %Cancel+-Cancel the update   %I+-Insert    %Save+-Save/Update
++Line:    %D+-Delete   %S+-Review/Update
+%
+%Sel  %List Name
++
+)Model
+@z   +!z         +
+)Init
+  .ZVARS = '(ZSEL NICKNAME)'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+)End

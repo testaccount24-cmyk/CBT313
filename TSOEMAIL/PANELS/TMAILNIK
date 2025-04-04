@@ -1,0 +1,35 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+   + type(text  ) intens(low ) Skip(on)
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¦ type(output) intens(high) caps(on) just(asis ) color(turq)
+)Body
++---------------------% TSO/E-Mail Nick Name Management +-----------------------
+%Selection ===>_zcmd
++
++Select which Nick Name data set you wish to process by enter any non-blank
++next to the data set name:
++
++ Sel  Data Set Name
++  @z+ ¦prim
++  @z+ ¦alt1
++  @z+ ¦alt2
++  @z+ ¦alt3
++  @z+ ¦alt4
++  @z+ ¦alt5
++  @z+ ¦alt6
++  @z+ ¦alt7
++  @z+ ¦alt8
++  @z+ ¦alt9
++
++
+!    To create a new alternate nick name data select the primary (1st) data set
+!    and then update the control information
++
+!    Enter PF3 to terminate processing at this point.
+)Init
+  .ZVARS = 'ZP Z1 Z2 Z3 Z4 Z5 Z6 Z7 Z8 Z9'
+)Proc
+)End

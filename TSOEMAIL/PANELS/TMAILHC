@@ -1,0 +1,22 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬File Copy`option will copy the received data set to an existing
+`      or new data set.  If the received data set is a PDS then you can
+`      elect to have the members replace existing members during the copy
+`      to an existing data set if you wish.
+`
+`      Select¬Yes`for ISPF statistics if you are copying a sequential file
+`      into a PDS and wish ISPF statistics to be generated.
+`
+)End

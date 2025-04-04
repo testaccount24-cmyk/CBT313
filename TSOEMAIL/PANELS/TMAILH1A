@@ -1,0 +1,25 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬FIND`command will scroll the table to the row in which the
+`      specified character string is found in any field in the table.
+`
+`
+`      Syntax: ¬FIND value
+`
+`      Note:   ¬FIND`can be abbreviated to¬F
+`
+`
+`
+`
+)End

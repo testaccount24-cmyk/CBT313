@@ -1,0 +1,33 @@
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(off) just(left )
+   % type(text) intens(high)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   ` type(text) intens(high) color(turq)
+  @ type(output) color(blue) just(left) caps(off) color(turq)
+)Body Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker Help+@ver%-\-\-
++Command%===>_zcmd
+`
+%SPELLC`is an ISPF Edit Macro that will do a basic spelling verification on
+`the file currently active in ISPF Edit. Note that the file does NOT have to
+`be saved first.
+`
+`Before spelling verification begins each record is scanned and special
+`characters are translated to blank. These characters include :,?()*=;<>Ý¨!
+`after which each word will have all surrounding quotes ' and " removed as
+`well as any trailing periods.
+`
+`The personal dictionary is any sequential data set, or PDS member, with a
+`list of words separated by blanks on as many records as needed.
+`
+`The user can call the%SPELLC`command with a starting and ending line number
+`or line label, or with no parameters. The%SPELLCA`command can be used to add
+`a word to your personal dictionary by entering%SPELLCA`on the command line and
+`placing the cursor on the desired word - then pressing enter.
+`
+`The spelling verification is not exhaustive but is an excellent start for
+`those of us who need a little extra help with our spelling.
+)Init
+)Proc
+)End

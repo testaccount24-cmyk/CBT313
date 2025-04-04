@@ -1,0 +1,50 @@
+        /* --------------------  rexx procedure  --------------------  */
+        /* Name:      TMAILSM                                          */
+        /*                                                             */
+        /* Function:  Registration Dialog for the TSO/E Safe Mail      */
+        /*            function.                                        */
+        /*                                                             */
+        /* Author:    Lionel B. Dyck                                   */*
+        /*            Kaiser Permanente Information Technology         */*
+        /*            25 N. Via Monte Ave.                             */*
+        /*            Walnut Creek, CA 94598                           */*
+        /*            (925) 926-5332                                   */*
+        /*            Internet: lionel.b.dyck@kp.org                   */*
+        /*                                                             */
+        /* History:   05/02/90 - Lionel Dyck                           */
+        /*            Creation of this exec                            */
+        /*                                                             */
+        /* ----------------------------------------------------------  */
+
+        arg opt
+
+        if opt = "DEBUG" then trace i
+
+        unit = "SYSDA"
+
+        Address ISPEXEC "Vget Sendctr"
+        center = sendctr
+
+        Address ISPEXEC "DISPLAY PANEL(TMAILSM)"
+        if rc > 4 then exit
+
+        "ALLOC F(SAFEMAIL) UNIT("unit") SPACE(1) TRACKS RECFM(F) LRECL(80)"
+
+        msg.1 = "SAFEMAIL:" opt userid
+
+        "EXECIO 1 DISKW SAFEMAIL (FINIS STEM msg."
+
+        /*  trap transmit messages so user does not see them  */
+        if opt <> "DEBUG" then
+           x = OUTTRAP("output.",'*',"CONCAT")
+
+        "XMIT" center".SAFEMAIL MSGDD(SAFEMAIL) NOLOG NONOTIFY",
+               "NOPROLOG NOEPILOG"
+
+        "FREE F(SAFEMAIL)"
+
+        mailsmsg = "Registered"
+        if opt = "ADD" then opt = "registered with"
+                       else opt = "withdrawn from"
+        maillmsg = "Your userid ("userid") has been" opt "the SAFEMAIL system"
+        Address ISPEXEC "SETMSG MSG(MAIL000)"

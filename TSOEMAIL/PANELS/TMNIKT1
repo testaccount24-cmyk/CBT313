@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++-------------------------% TSO Mail Nick Name Table +--------------------------
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+%
++Command: %I+-Insert   %F+-Find     %Cancel+-Cancel  %Save+-Save
++Line:    %I+-Insert   %D+-Delete   %N+-Send note    %S+-Update/Review
+%
+%Sel  %Nickname   Userid     Node     Name
++
+)Model
+@z   +!z         `z         `z       `z
+)Init
+  .ZVARS = '(ZSEL NICKNAME USERID NODE NAME)'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+ Ver (&zsel,list,&b,I,D,S,N)
+)End

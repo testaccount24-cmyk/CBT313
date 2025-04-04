@@ -1,0 +1,36 @@
+)Attr Default(%+_)
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_') color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+   % type(text) intens(high)
+   + type(text  ) intens(low )
+     skip(on)
+   # type(output) intens(high) caps(off) just(asis ) color(yellow)
+)Body
++----------------% Softcopy Publications Administration Menu +------------------
+%Command ===>_zcmd
+%
+%
+   %1+ Build            Build the Softcopy ISPF Tables
+   %2+ Review           Review Contents of Softcopy ISPF Tables
+   %3+ Test             Test the built tables
+   %4+ Copy             Copy the built tables into Production
+  % 5+ Update Shelf     Update a Book Shelf (Edit)
++
+   %6+ Collect          Collect a report of all Book Shelves for use in 7
+   %7+ Update           Update the BUILD control member
++
+   %8+ Index Build      Invoke BookManager/Read Index Utility
+   %9+ Usage Reports    Build usage reports and delete exec's
++
++   Optional div/dept for option 3%===>_panacc
++
+)Init
+  .Help  = SOFTPBHA
+  .cursor = zcmd
+)Proc
+  if (&zcmd NE &z)
+    ver (&zcmd,range,1,9)
+)END

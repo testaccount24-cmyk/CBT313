@@ -1,0 +1,32 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++-------------------------% TSO/E-Mail LOG Tutorial +---------------------------
+%Command ===>_zcmd
+%
+`      The following commands may be entered on the ISPF Command line when
+`      in the TSO/E-Mail LOG Table display.  Information on them will be
+`      presented in sequence or selected by number.
+
+¦      Action Command Options:
+
+¦      1 -¬Find              `Find any character string anywhere in the table
+¦      2 -¬Sendmail          `Send a note to another user
+¦      3 -¬Sort              `Sort the table by the specified field name
+
+¦      Display Command Options:
+
+¦         ¬Long              `Use the default 2 line display for each message
+¦         ¬Short             `Use a short 1 line display for each message
+¦         ¬XLong             `Use a extra long 3 line display for each message
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 1,tmailh1a  2,tmailh1c  3,tmailh1d *,?)
+)End

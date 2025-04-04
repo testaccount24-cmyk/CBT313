@@ -1,0 +1,73 @@
+)Attr
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++------------------------% TSO/E-Mail File Processing +-------------------------
+%Selection ===>_zcmd
+%
+%
+          %0  Read    `- Read the message that accompanied the data set
+          %1  Browse  `- Browse the data set
+          %2  Edit    `- Edit the data set
+          %3  Print   `- Print the data set
+          %4  Rename  `- Rename the data set
+          %5  Copy    `- Copy the data set
+          %6  PDS     `- Use the PDS Command on the data set
+          %7  Delete  `- Delete the data set
+          %8  Unterse `- Unterse a file from IBMLINK
+          %9  XMIT    `- Transmit the file to another user
+%
+%     Data Set Name:!mailtds
+%
+#    !mailsubj
+#           Userid:!mailfid
+#           Node:  !mailfloc
+#           Date:  !maildatd    #Time: !mailtime
+)Init
+  .HELP = TMAILH2C
+  &zcmd = &z
+)Proc
+       &ZCMD = TRANS(&ZCMD RE,0
+                           REA,0
+                           READ,0
+                           B,1
+                           BR,1
+                           BRO,1
+                           BROW,1
+                           E,2
+                           ED,2
+                           EDI,2
+                           EDIT,2
+                           P,3
+                           PR,3
+                           PRT,3
+                           PRNT,3
+                           PRIN,3
+                           RN,4
+                           REN,4
+                           RENA,4
+                           RENM,4
+                           C,5
+                           CO,5
+                           COP,5
+                           CPY,5
+                           COPY,5
+                           PDS,6
+                           DEL,7
+                           PTF,8
+                           UNT,8
+                           UNTE,8
+                           UNTER,8
+                           UNTERS,8
+                           UNTERSE,8
+                           XMIT,9
+                           *,*)
+            &mailsmsg = 'Error'
+            &maillmsg = 'Option &ZSEL invalid, choose a valid option:'
+ VER (&ZCMD,RANGE,0,9,MSG=MAIL000)
+)End

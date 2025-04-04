@@ -1,0 +1,31 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   \ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`      The\Answer`option is used to send an anwser to the sender of the
+`      selected message.  This option is a fast path to the SENDMAIL
+`      command with the receiving node and userid predefined with the node
+`      name and userid of the person who sent you the message.  The subject
+`      is also predefined with the subject of the original message.
+`
+`      The\Delete`option is used to delete the message and any associated
+`      file that accompanied the message.  Note that you will be prompted
+`      to confirm the deletion of the file so that you can keep the file
+`      even though you have deleted the message, or delete the file and
+`      retain the message. Use of\DN`will delete the message and file
+`      without any prompting.
+`
+`      The\Delete`option may also be specified as\DM`to only delete the
+`      message, or as\DF`to delete the file and retain the message.
+`
+`      The\Edit`option will invoke ISPF Edit to allow the user to edit
+`      the saved message.
+)End

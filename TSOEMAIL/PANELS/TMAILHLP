@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++--------------------------% TSO/E-Mail Processing +----------------------------
+%Command ===>_zcmd
+%
+
+`    TSO Mail Processing is an extension to the standard IBM provided TSO
+`    Transmit and Receive commands that provides full screen ISPF dialog
+`    support for sending and receiving messages and files.
+
+
+     The following tutorial options will be displayed in sequence or may
+     be selected by number:
+
+¦    1 -¬Commands          `Commands that may be entered on the Command line
+¦    2 -¬Message Options   `Selection options for individual messages/files
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 1,tmailh1 2,tmailh2 *,?)
+)End

@@ -1,0 +1,21 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   \ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The\Merge`option is used to merge the data set associated with this
+`      message into a message.  This is done only for those data sets that
+`      have a line length of 80 characters per line or less.  The data set
+`      text is merged into the message.
+`
+`      Use of\MF`will force a merge even if the data does exceed 80 bytes
+`      per line.
+)End

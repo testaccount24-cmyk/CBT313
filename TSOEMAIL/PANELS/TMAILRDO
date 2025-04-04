@@ -1,0 +1,36 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)BODY
+%&Z$SYS -----------------% TSO/E-Mail Transmit Error +--------------------------
+`Command ===>_zcmd
++
++
+%An Error occurred during Transmit:                                     +
+%&maillmsg
+
+
+`Verify the you have specified below a valid nickname or node.userid:
++
+`Send to  %===>_SENDID
+
++
++
++
+`Press%ENTER`to re-send Transmit Message or%END`to terminate.
++
++
++
+)INIT
+  .CURSOR = SENDID
+)PROC
+  VER (&SENDID,NB)
+  VPUT SENDID SHARED
+)END

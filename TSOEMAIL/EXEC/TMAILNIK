@@ -1,0 +1,869 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TMAILNIK                                           *
+         *                                                               *
+         * Function:  Maintain the user's Nick Names for TSO Transmit    *
+         *            processing.                                        *
+         *                                                               *
+         * Syntax:    %TMAILNIK                                          *
+         *                                                               *
+         * Dependencies:                                                 *
+         *            The name of the nick name file is defined in       *
+         *            either load module INMXPARM or in SYS1.PARMLIB     *
+         *            member IKJTSOxx via LOGSEL(xx) and LOGNAME(xx).    *
+         *                                                               *
+         *            The name is set in variable names_file and must    *
+         *            conform to the above.                              *
+         *                                                               *
+         *            ISPF Command Table MAILCMDS must contain:          *
+         *                                                               *
+         *            Verb    T   Action                                 *
+         *            RFIND   0   &USRFIND                               *
+         *                        Allow RFIND to be processed by me.     *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * History:                                                      *
+         *            10/01/93 - minor fix to nickname on panel tmniktll *
+         *            07/06/92 - change to use delword instead of overlay*
+         *            01/31/92 - General cleanup                         *
+         *            01/11/92 - Add 'Found' message for successful      *
+         *                       search                                  *
+         *            12/11/91 - Creation of this procedure              *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        arg option
+        if option = "DEBUG" then trace i
+
+        names_file = "'"sysvar(syspref)".NAMES.TEXT'"
+
+        if "ACTIVE" = sysvar('sysispf') then do
+           Address ISPEXEC "VGET ZAPPLID"
+
+           cmd = sysvar('sysicmd')
+
+           if zapplid <> "MAIL" then do
+           Address ISPEXEC "SELECT CMD(%"cmd options") NEWAPPL(MAIL)"
+           exit
+           end
+
+        end
+
+        null = ""
+
+        Address ISPEXEC "Vget Sendctr"
+        center = sendctr
+    /*  "Showtso Center"  */
+
+        dd_name = "NK"random()
+
+        type = "Primary"
+        call init_all
+
+        if sysdsn(names_file) = "OK" then
+           call read_it
+           else do
+                new_table = "on"
+                in.0 = 0
+                "Alloc ds("names_file") New Space(15,15) Tracks",
+                  "RECFM(F B) LRECL(80) BLKSIZE(0) DSORG(PS)"
+                "Free ds("names_file")"
+                prim = names_file
+                signal do_table
+                end
+
+        Disp_query:
+        usrfind = null
+        Address ISPEXEC "VPUT USRFIND"
+        parse value null with zp z1 z2 z3 z4 z5 z6 z7 z8 z9 zcmd
+        Address ISPEXEC "Display Panel(TMAILNIK)"
+        if rc > 0 then exit 0
+
+           select
+             when length(zp) > 0 then new_nick = prim
+             when length(z1) > 0 then new_nick = alt1
+             when length(z2) > 0 then new_nick = alt2
+             when length(z3) > 0 then new_nick = alt3
+             when length(z4) > 0 then new_nick = alt4
+             when length(z5) > 0 then new_nick = alt5
+             when length(z6) > 0 then new_nick = alt6
+             when length(z7) > 0 then new_nick = alt7
+             when length(z8) > 0 then new_nick = alt8
+             when length(z9) > 0 then new_nick = alt9
+             otherwise new_nick = null
+             end
+
+        if length(new_nick) = 0 then do
+           mailsmsg = null
+           maillmsg = "You must select one data set or exit via PF3"
+           Address ISPEXEC "SETMSG MSG(MAIL000)"
+           signal disp_query
+           end
+
+        if prim = new_nick then type = "Primary"
+                           else type = "Alternate"
+
+        if sysdsn(new_nick) <> "OK" then do
+             mailsmsg = "Error"
+             maillmsg = new_nick "could not be found"
+             Address ISPEXEC "Setmsg Msg(MAIL00)"
+             signal disp_query
+             end
+
+           names_file = new_nick
+           nickds = new_nick
+           call init_all
+           call read_it
+
+        /* --------------------------------------------------------
+           Now build the appropriate ISPF information for the selected
+           data set.
+           -------------------------------------------------------- */
+
+        do i = 1 to in.0
+         in_u = in.i
+         upper in_u
+         select
+          when pos(":ALTCTL.",in_u) > 0 then do
+             if type = "Primary" then do
+                parse value in_u with ":ALTCTL." val
+                c = altctl.0 + 1
+                altctl.c = strip(val)
+                altctl.0 = c
+                end
+             end
+          when pos(":LOGSEL.",in_u) > 0 then do
+             if type = "Primary" then
+               parse value in_u with ":LOGSEL." logsel .
+               end
+          when pos(":LOGNAME.",in_u) > 0 then do
+             if type = "Primary" then
+               parse value in_u with ":LOGNAME." logname .
+               end
+          when pos(":PROLOG.",in_u) > 0 then do
+             if type = "Primary" then do
+                pos = pos(":PROLOG.",in_u)
+                val = substr(in.i,pos+8)
+                c = prolog.0 + 1
+                prolog.c = strip(val)
+                prolog.0 = c
+                end
+             end
+          when pos(":EPILOG.",in_u) > 0 then do
+             if type = "Primary" then do
+                pos = pos(":EPILOG.",in_u)
+                val = substr(in.i,pos+8)
+                c = epilog.0 + 1
+                epilog.c = strip(val)
+                epilog.0 = c
+                end
+             end
+          otherwise do
+            if pos(":NICK.",in_u) > 0 then do
+               if have_nick = "on" then do
+                 c = nick.0
+                 if node.c = null then node.c = center
+                 end
+               have_nick = "on"
+               c = nick.0 + 1
+                parse value in_u with ":NICK." val ":" .
+               nick.c = strip(val)
+               nick.0 = c
+               end
+            if pos(":LIST.",in_u) > 0 then do
+               node.c = "*List*"
+               parse value in_u with ":LIST." val ':' .
+               list.c = list.c strip(val)
+               end
+            if pos(":NODE.",in_u) > 0 then do
+               c = nick.0
+                parse value in_u with ":NODE." val ":" .
+               node.c = strip(val)
+               end
+            if pos(":USERID.",in_u) > 0 then do
+               c = nick.0
+               parse value in_u with ":USERID." val ":"  .
+               userid.c = strip(val)
+               end
+            if pos(":PHONE.",in_u) > 0 then do
+               c = nick.0
+               parse value in_u with ":PHONE." val ":"  .
+               phone.c = strip(val)
+               end
+            if pos(":INTERNET.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":INTERNET.",in_u)
+               val = substr(in.i,pos+10)
+               x = pos(":",val)
+               if x = 0 then
+                        Internet.c = strip(val)
+                        else
+                        Internet.c = strip(substr(val,1,x-1))
+               end
+            if pos(":ADDRESS1.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":ADDRESS1.",in_u)
+               val = substr(in.i,pos+10)
+               x = pos(":",val)
+               if x = 0 then
+                        Address1.c = strip(val)
+                        else
+                        Address1.c = strip(substr(val,1,x-1))
+               end
+            if pos(":ADDRESS2.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":ADDRESS2.",in_u)
+               val = substr(in.i,pos+10)
+               x = pos(":",val)
+               if x = 0 then
+                        Address2.c = strip(val)
+                        else
+                        Address2.c = strip(substr(val,1,x-1))
+               end
+            if pos(":ADDRESS3.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":ADDRESS3.",in_u)
+               val = substr(in.i,pos+10)
+               x = pos(":",val)
+               if x = 0 then
+                        Address3.c = strip(val)
+                        else
+                        Address3.c = strip(substr(val,1,x-1))
+               end
+            if pos(":ADDRESS4.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":ADDRESS4.",in_u)
+               val = substr(in.i,pos+10)
+               x = pos(":",val)
+               if x = 0 then
+                        Address4.c = strip(val)
+                        else
+                        Address4.c = strip(substr(val,1,x-1))
+               end
+            if pos(":NAME.",in_u) > 0 then do
+               c = nick.0
+               pos = pos(":NAME.",in_u)
+               val = substr(in.i,pos+6)
+               x = pos(":",val)
+               if x = 0 then
+                        name.c = strip(val)
+                        else
+                        name.c = strip(substr(val,1,x-1))
+               end
+            end
+          end
+        end
+
+        do_table:
+        table = random()
+
+        Address ISPEXEC
+
+        "TBcreate NICK"table" KEYS(NICKNAME)",
+                        "NAMES(NODE USERID NAME INTERNET",
+                        "PHONE ADDRESS1 ADDRESS2 ADDRESS3",
+                        "ADDRESS4 SEARCH) Nowrite"
+
+        "TBcreate LIST"table" KEYS(NICKNAME)",
+                        "NAMES(LIST SEARCH) Nowrite"
+
+        "TBcreate CTRL"table,
+                        "NAMES(Option Value Search) Nowrite"
+
+        if new_table = "on" then do
+           parse value null with nickname node user name,
+                            phone internet address1 address2,
+                            address3 address4 search
+           nick.0 = 0
+           altctl.0 = 0
+           prolog.0 = 0
+           epilog.0 = 0
+           end
+
+        do i = 1 to nick.0
+           if node.i <> "*List*" then do
+                     nickname = nick.i
+                     node     = node.i
+                     userid   = userid.i
+                     name     = name.i
+                     internet = internet.i
+                     phone    = phone.i
+                     address1 = address1.i
+                     address2 = address2.i
+                     address3 = address3.i
+                     address4 = address4.i
+                     search = nickname node userid name internet,
+                              phone address1 address2 address3 address4
+                     upper search
+                     "TBADD NICK"table
+                     end
+                else do
+                     nickname = nick.i
+                     list     = strip(list.i)
+                     search = nickname list
+                     upper search
+                     "TBADD LIST"table
+                     parse value null with userid name
+                     nickname = nick.i
+                     node     = node.i
+                     search = nickname node
+                     upper search
+                     "TBADD NICK"table
+                     end
+           end
+
+        if type = "Primary" then do i = 1 to altctl.0
+           option = ":Altctl."
+           value = altctl.i
+           search = option value
+           upper search
+           "TBADD CTRL"table
+           end
+
+        if type = "Primary" then do i = 1 to prolog.0
+           option = ":Prolog."
+           value = prolog.i
+           search = option value
+           upper search
+           "TBADD CTRL"table
+           end
+
+        if type = "Primary" then do i = 1 to epilog.0
+           option = ":Epilog."
+           value = epilog.i
+           search = option value
+           upper search
+           "TBADD CTRL"table
+           end
+
+        if type = "Primary" then
+           if length(logsel) > 0 then do
+           option = ":Logsel."
+           value = logsel
+           search = option value
+           upper search
+           "TBADD CTRL"table
+           end
+
+        if type = "Primary" then
+           if length(logname) > 0 then do
+           option = ":Logname."
+           value = logname
+           search = option value
+           upper search
+           "TBADD CTRL"table
+           end
+
+        "TBSORT NICK"table "FIELDS(NICKNAME)"
+        "TBTOP NICK"table
+        "TBSORT LIST"table "FIELDS(NICKNAME)"
+        "TBTOP LIST"table
+        "TBTOP CTRL"table
+
+        if new_table = "on" then call do_Primary
+
+        do until lrc > 4
+           zcmd = null
+          "DISPLAY PANEL(TMNIKT0)"
+          lrc = rc
+
+          trc = 0
+          select
+            when zcmd = 1 then call do_Primary
+            when zcmd = 2 then call do_lists
+            when zcmd = 3 then call do_control
+            when zcmd = 4 then call save_it
+            otherwise if lrc = 0 then do
+                      mailsmsg = null
+                      maillmsg = "Invalid option selected"
+                      "SETMSG MSG(MAIL000)"
+                      end
+            end
+        end
+
+        Complete:
+        /* ----------------------------------------------
+           Processing is now about to terminate so we
+           have to close the ISPF Tables and reset things
+           in REXX.
+           ---------------------------------------------- */
+
+        "TBEND NICK"table
+        "TBEND LIST"table
+        "TBEND CTRL"table
+        Address TSO
+        signal Disp_query
+
+        /* the following code is called or signaled only */
+
+        do_lists:
+           trc = 0
+           zcmd = null
+              do until trc > 4
+              if trc = 4 then "TBDispl LIST"table
+                         else "TBDispl LIST"table "PANEL(TMNIKTL)"
+               trc = rc
+               select
+               when zcmd = "CANCEL" then signal complete
+               when zcmd = "SAVE" then call save_it
+               when zcmd = "I" then do
+                     zcmd = null
+                     "Display Panel(TMNIKTLN)"
+                     if rc = 0 then do
+                        nickname = listnick
+                        list = ''
+                        "TBADD LIST"table "ORDER"
+                        if rc = 0 then
+                           change_nick = "on"
+                           else do
+                                mailsmsg = "Error"
+                           maillmsg = "Error adding duplicate nickname list '",
+                                listnick"' to the table"
+                                "Setmsg Msg(MAIL000)"
+                                end
+                        change_list = "on"
+                        end
+                     end
+               when length(zcmd) > 0 then do
+                    ab = word(zcmd,1)
+                    if ab = "L" then do
+                       /*  do search in table */
+                       end
+                    end
+               when zsel = "S" then call list_sel
+               when zsel = "D" then do
+                  "TBDELETE LIST"table
+                  end
+               otherwise nop
+               end
+           end
+        return
+
+        list_sel:
+            "TBcreate TEMP Keys(LISTNICK) Nowrite Replace"
+            do i = 1 to words(list)
+               listnick = word(list,i)
+               "TBADD TEMP ORDER"
+               end
+           "TBSORT TEMP FIELDS(LISTNICK)"
+           "TBTOP  TEMP"
+            change_list = null
+            list_exit = null
+            do_list_sel:
+            do until list_exit = "on"
+               zcmd = null
+               if xtrc = 4 then "TBDispl TEMP"
+                           else "TBDispl TEMP Panel(TMNIKTLL)"
+                  xtrc = rc
+                  if xtrc > 4 then do
+                     if change_list = "on" then do
+                        mailsmsg = "Warning"
+                     maillmsg = "Changes have been made - Enter PF3 to cancel",
+                                    "or Save to save it"
+                        "SETMSG MSG(MAIL000)"
+                        change_list = null
+                        end
+                        else do
+                             "TBEND TEMP"
+                             list_exit = "on"
+                             end
+                  end
+                  if abbrev("CANCEL",zcmd,2) = 1 then do
+                     "TBEND TEMP"
+                      list_exit = "on"
+                     mailsmsg = "Cancelled"
+                     maillmsg = "Nickname list update has been cancelled"
+                     "SETMSG MSG(MAIL000)"
+                     end
+                  if zcmd = "I" then do
+                     zcmd = null
+                     "Display Panel(TMNIKTLI)"
+                     if rc = 0 then do
+                        list = list newid
+                        listnick = newid
+                        "TBADD TEMP ORDER"
+                        if rc = 0 then
+                           change_nick = "on"
+                           else do
+                                mailsmsg = "Error"
+                           maillmsg = "Error adding duplicate nickname list '",
+                                nickname"' to the table"
+                                "Setmsg Msg(MAIL000)"
+                                end
+                        change_list = "on"
+                        end
+                     end
+                  if abbrev("SAVE",zcmd,2) = 1 then do
+                     savetop = ztdtop
+                         "TBTOP TEMP"
+                         new_list = null
+                     do forever
+                         "TBSKIP TEMP"
+                         if rc > 0 then leave
+                         new_list = new_list listnick
+                         end
+                         list = new_list
+                     "TBPUT LIST"table
+                     savetop = ztdtop
+                     call save_it
+                       "TBTOP TEMP"
+                       "TBSKIP TEMP ROW("savetop")"
+                     mailsmsg = "Saved"
+                     maillmsg = "Nickname List has been saved"
+                     "SETMSG MSG(MAIL000)"
+                      change_list = null
+                      end
+                  if  zsel = "D" then do
+                      dw = wordpos(listnick,list)
+                      dw  = wordindex(list,dw)
+                      x = delword(list,dw)
+                      change_list = "on"
+                      list = x
+                      "TBDelete TEMP"
+                      end
+             end
+        return
+
+        do_control:
+           if type <> "Primary" then do
+              mailsmsg = "Error"
+              maillmsg = "Control processing is not allowed for other than",
+                         "the Primary data set"
+              "SETMSG MSG(MAIL000)"
+              return
+              end
+           "TBTOP CTRL"table
+           trc = 0
+           zcmd = null
+           do until trc > 4
+              if trc = 4 then "TBDispl CTRL"table
+                         else "TBDispl CTRL"table "PANEL(TMNIKT2)"
+               trc = rc
+               select
+               when zcmd = "CANCEL" then signal complete
+               when zcmd = "SAVE" then call save_it
+               when zcmd = "I" then do
+                  option = null
+                  value = null
+                  "TBADD CTRL"table
+                  end
+               when zsel = "I" then do
+                  option = null
+                  value = null
+                  "TBADD CTRL"table
+                  end
+               when zsel = "U" then do
+                  "TBPUT CTRL"table
+                  end
+               when zsel = "D" then do
+                  "TBDELETE CTRL"table
+                  end
+               otherwise
+                  "TBPUT CTRL"table
+               end
+           end
+           return
+
+        do_Primary:
+           change_nick = null
+           do until trc > 4
+                zcmd = null
+                if disp_panel = "row" then
+                   "TBDISPL NICK"table "PANEL(TMNIKT1) CSRROW("skiprow")"
+                   else do
+                   if trc = 4 then "TBDispl NICK"table
+                              else "TBDISPL NICK"table" PANEL(TMNIKT1)"
+                   trc = rc
+                   end
+                disp_panel = null
+
+           if word(zcmd,1) = "DEBUG" then do
+              parse value zcmd with w1 w2
+              if w2 = "OFF" then trace off
+              if length(w2) = 0 then trace i
+              if w2 = "ON" then trace i
+              end
+
+           if zcmd = "I" & length(zsel) = 0  then do
+              zsel = zcmd
+              zcmd = null
+              end
+
+           if zcmd = "CANCEL" then signal complete
+
+           if zcmd = "SAVE" then do
+              savetop = ztdtop
+              call save_it
+                "TBTOP NICK"table
+                "TBSKIP NICK"table "ROW("savetop")"
+              change_nick = null
+              end
+
+           if zcmd = "RFIND" then do
+              zcmd = "FIND" argument
+              zsel = null
+                 "TBSKIP NICK"table "POSITION(SKIPROW) ROWID(ROWID)"
+              end
+
+           if abbrev("FIND",word(zcmd,1),1) = 1 then do
+              /* perform search */
+              usrfind = "PASSTHRU"
+              save_top = ztdtop
+              rowid = save_top + 1
+              "VPUT USRFIND"
+              find_loop = null
+              "TBSKIP NICK"table "ROW("ROWID")"
+              parse value zcmd with x argument
+              do forever
+                 if pos(argument,search) > 0 then do
+                    "TBTOP NICK"table
+                    "TBSKIP NICK"table "ROW("ROWID")"
+                    disp_panel = "row"
+                        mailsmsg = "Found"
+                        maillmsg = argument "found during search"
+                        "Setmsg Msg(MAIL000)"
+                    leave
+                    end
+                 "TBSKIP NICK"table "POSITION(SKIPROW) ROWID(ROWID)"
+                 if rc > 0 then do
+                       "TBTOP NICK"table
+                    if find_loop = "on" then do
+                        mailsmsg = "Not Found"
+                        maillmsg = argument "Not found during search"
+                        "Setmsg Msg(MAIL000)"
+                        rowid = save_top
+                        "TBTOP NICK"table
+                        "TBSKIP NICK"table "ROW("ROWID")"
+                        disp_panel = "row"
+                        leave
+                        end
+                        else find_loop = "on"
+                    end
+                 zsel = null
+                 end
+              end
+
+           upper zsel
+           select
+             when zsel = "I" then do
+                  parse value null with nickname node userid name,
+                              address1 address2 address3 address4,
+                              internet
+                  zcmd = null
+                  "DISPLAY PANEL(TMNIKT1A)"
+                  if rc = 0 then do
+                     "TBADD NICK"table "ORDER"
+                     if rc = 0 then
+                        change_nick = "on"
+                        else do
+                             mailsmsg = "Error"
+                             maillmsg = "Error adding duplicate nickname '",
+                             nickname"' to the table"
+                             "Setmsg Msg(MAIL000)"
+                             end
+                     end
+                  end
+             when zsel = "N" then do
+                  "Select CMD(%TMAILSND" nickname ")"
+                  end
+             when zsel = "S" then do
+                  zcmd = null
+                  if left(node,6) = "*List*"
+                     then "Display Panel(TMNIKT1B)"
+                     else "DISPLAY PANEL(TMNIKT1A)"
+                  if rc = 0 then do
+                     "TBMOD NICK"table "ORDER"
+                     change_nick = "on"
+                     end
+                  end
+             when zsel = "D" then do
+                  if left(node,6) = "*List*" then do
+                     mailsmsg = "Error"
+                     maillmsg = "Cannot delete list entry from this option"
+                     "Setmsg Msg(MAIL000)"
+                     end
+                     else do
+                          "TBDELETE NICK"table
+                          change_nick = "on"
+                          end
+                  end
+             otherwise nop;
+             end
+        end
+        if change_nick = "on" then do
+          mailsmsg = null
+       maillmsg = "Warning: Issue '4' to save your changes or they will be lost"
+          "Setmsg Msg(MAIL000)"
+          end
+        return
+
+        Save_it:
+        /* ----------------------------------------------
+           Save the current nick name data set
+           ---------------------------------------------- */
+           save_nickname = nickname
+            "TBTOP NICK"table
+            "TBTOP LIST"table
+            "TBTOP CTRL"table
+            out. = null
+            out.0 = 0
+            if type = "Primary" then do forever
+              "TBSKIP CTRL"table
+              if rc > 0 then leave
+                if length(option) > 0 then do
+                  c = out.0 + 1
+                  out.c = option""value
+                  out.0 = c
+                end
+            end
+            do forever
+              "TBSKIP NICK"table
+              if rc > 0 then leave
+              if "*List*" = left(node,6) then iterate
+              c = out.0 + 1
+              out.c = ":Nick."left(nickname,8)
+              out.0 = c
+              c = out.0 + 1
+              out.c = "  :Node."strip(node)
+              out.0 = c
+              c = out.0 + 1
+              out.c = "  :Userid."left(userid,8)
+              out.0 = c
+              c = out.0 + 1
+              out.c = "  :Name."name
+              out.0 = c
+              if length(internet) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Internet."internet
+                out.0 = c
+                end
+              if length(phone) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Phone."phone
+                out.0 = c
+                end
+              if length(address1) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Address1."address1
+                out.0 = c
+                end
+              if length(address2) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Address2."address2
+                out.0 = c
+                end
+              if length(address3) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Address3."address3
+                out.0 = c
+                end
+              if length(address4) > 0 then do
+                c = out.0 + 1
+                out.c = "  :Address4."address4
+                out.0 = c
+                end
+            end
+            do forever
+              "TBSKIP LIST"table
+              if rc > 0 then leave
+              c = out.0 + 1
+              if words(list) > 7 then do
+                 out.c = ":Nick."left(nickname,8)
+                 c = c + 1
+                 out.c = ":List."subword(list,1,7)
+                 out.0 = c
+                 do cx = 8 to words(list) by 7
+                    c = c + 1
+                    out.c = ":List."subword(list,cx,7)
+                    out.0 = c
+                    end
+                 end
+                 else do
+                      out.c = ":Nick."left(nickname,7)
+                      c = c + 1
+                      out.c = ":List."list
+                      end
+              out.0 = c
+            end
+            Address TSO
+            "Alloc f("dd_name") ds("names_file") SHR REUSE"
+            "Execio * diskw" dd_name "(finis stem out."
+            "Free F("dd_name")"
+             Address ISPEXEC
+             mailsmsg = "Saved"
+             maillmsg = names_file" has been saved..............."
+             Address ISPEXEC "SETMSG MSG(MAIL000)"
+           nickname = save_nickname
+        return
+
+        Read_it:
+        /* ----------------------------------------------
+           Read in the nick name data set and prepare for
+           processing:
+           ---------------------------------------------- */
+        in. = null
+        "Alloc f("dd_name") ds("names_file") SHR REUSE"
+        "Execio * diskr" dd_name "(finis stem in."
+        "Free F("dd_name")"
+
+        if type = "Primary" then do
+           /* --------------------------------------------------------
+              Determine which nick name library the user wishes to
+              process.
+              -------------------------------------------------------- */
+
+        parse value null with prim alt1 alt2 alt3 alt4 alt5 alt6 alt7 alt8 alt9
+           parse value null with zp z1 z2 z3 z4 z5 z6 z7 z8 z9
+
+           c = 0
+           prim = names_file
+
+           do i = 1 to in.0
+              in_u.i = in.i
+              upper in_u.i
+              if pos(":ALTCTL.",in_u.i) > 0 then do
+                 parse value in_u.i with ":ALTCTL." val .
+                 c = c + 1
+                 vu = strip(val)
+                 interpret "alt"c "=" "'''"vu"'''"
+                 end
+           end
+         end
+        return
+
+
+        Init_all:
+        /* ----------------------------------------------
+           Perform the initializations of all the common
+           variables used in this REXX procedure.
+           ---------------------------------------------- */
+        if type = "Primary" then do
+           altctl. = null
+           altctl.0 = 0
+           logsel = null
+           logname = null
+           prolog. = null
+           epilog. = null
+           prolog.0 = 0
+           epilog.0 = 0
+           end
+        nick. = null
+        name. = null
+        node. = null
+        list. = null
+        userid. = null
+        phone. = null
+        address1. = null
+        address2. = null
+        address3. = null
+        address4. = null
+        internet. = null
+        other. = null
+        nick.0 = 0
+        have_nick = "off"
+        return

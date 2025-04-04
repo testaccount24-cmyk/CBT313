@@ -1,0 +1,54 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ` type( input) intens(high) caps(off) just(asis )
+   ! type(output) intens(high) caps(off) just(asis )
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+   } type(output) intens(high) caps(off) just(asis )
+)Body  Expand(//)
+%-/-/- ~$libt    ~Compare Dataset }ver  %-/-/-
+%Command ===>_zcmd
++
++Compare member: !mem       +in dataset:!dsn
++to Dataset    : @cdsn                                           +
++to Member     : @cmem    + +if blank will use Compare Member name
++to Volume     : @cvol  +    optional
++Sequence Numbers: `cps+     Yes or No
++
++Enter the dataset name and optional volume serial, or select the dataset
++from the list below. Then press enter to Compare or PF3 to cancel.
++
+%Sel #Dsname+                                         #Volume
++
+)Model
+@z+  !z                                               !z     +
+)Init
+  &cps = trans(trunc(&cps,1) Y,Yes N,No &z,No y,Yes n,No)
+  .ZVARS = '(zsel ldsn lvol)'
+)Proc
+ &cps = trans(trunc(&cps,1) Y,Yes N,No &z,No y,Yes n,No *,*)
+ ver (&cps,nb,list,Yes,No)
+ if (&zsel EQ &z)
+     ver(&cdsn,nb,dsname)
+)End
+/*  Copyright (C) 2002, Lionel B. Dyck
+/*
+/*  This program is free software; you can redistribute it
+/*  and/or modify it under the terms of the GNU General Public
+/*  License as published by the Free Software Foundation;
+/*  either version 2 of the License, or (at your option) any
+/*  later version.
+/*
+/*  This program is distributed in the hope that it will be
+/*  useful, but WITHOUT ANY WARRANTY; without even the implied
+/*  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+/*  PURPOSE.  See the GNU General Public License for more
+/*  details.
+/*
+/*  You should have received a copy of the GNU General Public
+/*  License along with this program; if not, write to the Free
+/*  Software Foundation, Inc., 59 Temple Place - Suite 330,
+/*  Boston, MA  02111-1307,

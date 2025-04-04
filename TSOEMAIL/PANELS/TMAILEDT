@@ -1,0 +1,115 @@
+)ATTR /* EDIT PANEL WITH NO ACTION BAR & NO HIGHLIGHTING */
+  _ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) FORMAT(&MIXED)
+  | AREA(DYNAMIC) EXTEND(ON) SCROLL(ON) USERMOD(20)
+  ! TYPE(OUTPUT) INTENS(HIGH) PAD(-)
+  ~ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) COLOR(TURQ)
+  \ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) COLOR(GREEN)
+  ` TYPE(INPUT) CAPS(ON) INTENS(HIGH) FORMAT(&MIXED)
+  # type(output) intens(high) color(turq)
+ 01 TYPE(DATAOUT) INTENS(LOW)
+ 02 TYPE(DATAOUT) INTENS(HIGH)
+ 03 TYPE(DATAOUT) SKIP(ON) /* FOR TEXT ENTER CMD. FIELD */
+ 04 TYPE(DATAIN)  INTENS(LOW)  CAPS(OFF) FORMAT(&MIXED)     /*@OY36835*/
+ 05 TYPE(DATAIN)  INTENS(HIGH) CAPS(OFF) FORMAT(&MIXED)     /*@OY36835*/
+ 06 TYPE(DATAIN)  INTENS(LOW)  CAPS(IN)  FORMAT(&MIXED)
+ 07 TYPE(DATAIN)  INTENS(HIGH) CAPS(IN)  FORMAT(&MIXED)     /*@OY36835*/
+ 08 TYPE(DATAIN)  INTENS(LOW)  FORMAT(DBCS)
+ 09 TYPE(DATAIN)  INTENS(LOW)  FORMAT(EBCDIC)
+ 0A TYPE(DATAIN)  INTENS(LOW)  FORMAT(&MIXED)
+ 0D TYPE(DATAIN)  INTENS(LOW)  CAPS(IN)  FORMAT(&MIXED) COLOR(BLUE)
+ 20 TYPE(DATAIN)  INTENS(LOW) CAPS(IN) FORMAT(&MIXED)
+)BODY WIDTH(&ZWIDTH) EXPAND(//)
+%EDIT TSO Message #tmever%------------/-/---------------------------------------
++Command ===>_ZCMD                    / /                     +Scroll ===>_Z   %
++To:~SENDID
++From:~SENDFRM1                         +Log the message:`Z+ (Y or N)
+~SENDFRM2                               +Acknowledgement:`Z+ (Y or N)
+~SENDFRM3                               +Append Epilog:  `Z+ (Y or N)
++Subject:\SENDSUBJ                                                       +     +
+|ZDATA -------------------------------/-/--------------------------------------|
+|                                     / /                                      |
+| ------------------------------------/-/--------------------------------------|
+ %&PFE+= Send message   %CANCEL+to abort message     Stamped: &SENDSTMP
+)INIT
+  .ZVARS = 'ZSCED LOG ACK EPI'
+  IF (&ZVMODET = 'VIEW')   /* VIEW MODE                 */
+    .HELP = ISR10000       /* DEFAULT TUTORIAL NAME     */
+  ELSE                     /* EDIT MODE                 */
+    .HELP = ISR20000       /* DEFAULT TUTORIAL NAME     */
+  &MIXED = MIX             /* SET FORMAT MIX            */
+  IF (&ZPDMIX = N)         /* IF EBCDIC MODE REQUESTED  */
+    &MIXED = EBCDIC        /*  SET FORMAT EBCDIC        */
+  VGET (ZSCED) PROFILE     /* FILL SCROLL VARS IF       */
+  IF (&ZSCED = ' ')        /* BLANK WITH PAGE.          */
+   &ZSCED = 'PAGE'         /*                           */
+
+  &TMAILCAN = &Z
+  &PFE = PFK(END)
+  IF (&PFE = &Z)  &PFE = 'END'
+  &LOG = TRANS(&TMAILLOG Y,Y N,N &Z,Y *,*)
+  &ACK = TRANS(&TMAILACK Y,Y N,N &Z,Y *,*)
+  &EPI = TRANS(&TMAILEPI Y,Y N,N &Z,Y *,*)
+  IF (&LOG = &Z)  &LOG = 'Y'
+  IF (&ACK = &Z)  &ACK = 'Y'
+  IF (&EPI = &Z)  &EPI = 'Y'
+  IF (&SENDSUBJ = &Z)
+     .CURSOR = SENDSUBJ
+  IF (&SENDSUBJ NE &Z)
+     IF (&FWD = 'YES')
+        .CURSOR = zcmd
+
+  VGET (SENDSUBJ) SHARED
+
+)REINIT
+
+  REFRESH(SENDSUBJ,SENDFRM1,SENDFRM2,SENDFRM3)
+  REFRESH(ZCMD,ZSCED,ZDATA)
+
+  VGET (SENDSUBJ) SHARED
+
+  IF (&ZVMODET = 'VIEW')   /* VIEW MODE                 */
+    .HELP = ISR10000       /* DEFAULT TUTORIAL NAME     */
+  ELSE                     /* EDIT MODE                 */
+    .HELP = ISR20000       /* DEFAULT TUTORIAL NAME     */
+
+)PROC
+  &ZCURSOR = .CURSOR
+  &ZCSROFF = .CSRPOS
+  &ZLVLINE = LVLINE(ZDATA)
+  VPUT (ZSCED) PROFILE
+
+    VER(&SENDFRM1,NB)
+    VPUT (SENDID SENDSUBJ) SHARED
+    VER (&LOG,NB,LIST,Y,N)
+    VER (&ACK,NB,LIST,Y,N)
+    VER (&EPI,NB,LIST,Y,N)
+    &TMAILLOG = &LOG
+    &TMAILACK = &ACK
+    &TMAILEPI = &EPI
+    VPUT (SENDFRM1,SENDFRM2,SENDFRM3,TMAILLOG,TMAILACK,TMAILEPI) PROFILE
+
+)END
+
+/********************************************************************/
+/* Use variable ZDSVOL to display the volume of the data set        */
+/********************************************************************/
+/*  DYNAMIC AREA SCREEN WIDTH FROM PQUERY. (80,132,160)
+/*  DYNAMIC AREA SCREEN DEPTH FROM PQUERY. (24,32,43,27,60)
+
+/* $SEG(ISREFR01) COMP(EDIT)       PROD(MVS):                        */
+/* CHANGE ACTIVITY                                                   */
+/* $PN= REASON    RELEASE    DATE    ORIGIN : COMMENT                */
+/* $L1= SPELLCHK  M310      890307   040100 :                        */
+/* $BE= USERREQ   OS390R3   961010   040100 :  add zdsvol            */
+/*                                                                    */
+/* OY36835 - 901105 - SYSROUTE OF OY34744                             */
+/*                    UNABLE TO INVOKE THE EDIT SERVICE WITH PANEL    */
+/*                    ISREFR01 AND EDIT DBCS DATA. THE FORMAT(&MIXED) */
+/*                    KEYWORD HAS BEEN ADDED TO SOME OF THE ATTRIBUTE */
+/*                    CHARS TO SUPPORT DBCS.                          */
+/*                    GT4045 - KHL                                    */
+/*                                                                    */
+/* OW19632 - 960409 - Column number fields expanded to 5 characters   */
+/*                    GT4045 - MOS                                    */
+/*                                                                    */
+ /* 5645-001, 5655-042 (C) COPYRIGHT IBM CORP 1980, 1996 */

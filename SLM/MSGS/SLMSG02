@@ -1,0 +1,9 @@
+* Copyright (C) 2002, Lionel B. Dyck under terms of the GNU GPL
+SLMSG020  'Not Allowed'
+'Edit is not allowed when the member is not the active member.'
+SLMSG021  '&smsg'
+'&lmsg'
+SLMSG022  'Not Allowed'
+'You may not move a working member from the work library. Rename first.'
+SLMSG023  'Not Allowed'
+'Rename is not allowed when the member is not the active member.'

@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   ¦ type( input) intens(high) caps(on ) just(left) pad('_') color(white)
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+)Body
++---------------------% TSO/E-Mail Nick Name Validation +-----------------------
+%Command ===>_zcmd
+%
+%
+`      The following nick names were specified, but could not be found in
+`      any nick name file.  Please correct the nick name(s) or blank them
+`      out and then press the¬ENTER`key to retry.
+
+`      To cancel this¬entire`transmission press the¬&END`key.
+`
+`
+`      Invalid Nick Names:
+      ¦tnames
+`
+)Init
+ .cursor = tnames
+  &END = PFK(END)
+)Proc
+ &zcmd = &z
+)End

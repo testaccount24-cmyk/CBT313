@@ -1,0 +1,236 @@
+  /*---------------------  rexx procedure  -------------------- *
+  | Name:      COBLAB                                          |
+  |                                                            |
+  | Function:  ISPF Edit Macro to Create Edit Labels for       |
+  |            each routine label for Cobol code.              |
+  |                                                            |
+  | Usage Notes:                                               |
+  |              Routine labels with numbers or special chars  |
+  |              will be have them translated to blanks.       |
+  |                                                            |
+  |              Existing labels will be unchanged.            |
+  |                                                            |
+  |              Duplicate labels will have a suffix of        |
+  |              A, B, ... appended if possible.               |
+  |              * if label is 5 chars then last removed and   |
+  |                the suffix appended.                        |
+  |                                                            |
+  |              Labels must start in any column from 8 to  11 |
+  |              May start with digits (000-A or 000A)         |
+  |              Any text starting beyond col 11 is ignored    |
+  |              Any numeric followed by space ignored         |
+  |              Any label ending with Section is a label      |
+  |              * in column 1 - ignore record                 |
+  |              - in column 7 - ignore record                 |
+  |              Any record without a . is ignored             |
+  |                                                            |
+  |              (Thanks to Ray Mullins for this set of rules) |
+  |                                                            |
+  | Dependencies:  Designed for use with Cobol code            |
+  |                Requires the SAVELAB package                |
+  |                                                            |
+  | Author:    Lionel B. Dyck                                  |
+  |                                                            |
+  | History:  (most recent on top)                             |
+  |            2023/08/24 MRM - Fix labels starting with Z     |
+  |                             replacing with A               |
+  |            2023/07/10 MRM - Fix bugs and remove now-       |
+  |                             unneeded code                  |
+  |            2023/07/10 LBD - Handle more Cobol labels       |
+  |            2023/07/08 LBD - Add more comments              |
+  |            2023/07/07 MRM - Streamlined parsing            |
+  |            2023/07/07 LBD - Creation from REXXLAB          |
+  |                                                            |
+  * ---------------------------------------------------------- */
+  signal on novalue
+  signal on halt
+  parse source . . s3 .
+  Address ISREdit
+  'Macro (options)'
+  Address ISPEXEC 'CONTROL ERRORS RETURN'
+
+  /* ---------------------- *
+  | Enable HILITE features |
+  * ---------------------- */
+  'hilite off'
+  'hilite logic cobol paren find search cursor'
+
+  /* ------------------- *
+  | Define our defaults |
+  * ------------------- */
+  parse value '' with null lab. data
+  count   = 0
+  current = 0
+  alpha   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+  /* ------------------------ *
+  | Common labels to ignore: |
+  * ------------------------ */
+  ignore_sect = null
+  ignore_para = 'PROGRAM-ID CLASS-ID FACTORY OBJECT METHOD-ID',
+    'AUTHOR INSTALLATION DATE-WRITTEN DATE-COMPILED SECURITY',
+    'REMARKS SOURCE-COMPUTER OBJECT-COMPUTER FD SD BASIS',
+    'CBL PROCESS *CBL *CONTROL DELETE EJECT INSERT SKIP1 SKIP2',
+    'SKIP3 TITLE'
+
+  /* -------------------- *
+  | Start the processing |
+  * -------------------- */
+Start:
+  '(last)  = linenum .zlast'
+  call get_labels
+
+  /* ------------------------------------ *
+  | Determine if Numbering type is Cobol |
+  * ------------------------------------ */
+Check_Number:
+  '(v1,numtype) = number'
+  if wordpos('COBOL',numtype) > 0
+  then cobol = 1
+  else cobol = 0
+
+  /* ------------------------------------------ *
+  | Do the actual process of generating labels |
+  * ------------------------------------------ */
+Do_It:
+  do i = 1 to last
+    '(d) = line' i
+    if cobol = 0 then d = substr(d, 7, 66)
+    else d = left(d, 66)
+
+    /* Anything in indicator area is a comment or a continuation */
+    if pos(left(d,1),'*-/') > 0 then
+    iterate
+
+    /* If Area A is empty, there's no paragraph */
+    if substr(d, 2, 4) == '    ' then
+    iterate
+
+    /* Ignore if initial floating comment */
+    if pos(' *>', d) > 0 then
+    iterate
+
+    /* Ignore if no period */
+    if pos('.',d) = 0 then iterate
+
+    d = translate(d)
+
+    parse var d w1 w2 w3 '.' .
+
+    /* Ignore certain paragraphs */
+    if pos(w1, ignore_para) > 0 then
+    iterate
+
+    /* Skip 01, 66, 77, 88 levels */
+    if datatype(w1) == "NUM" then
+    iterate
+
+    /* Ignore certain sections */
+    if w2 == 'SECTION' then
+    if pos(w1, ignore_sect) > 0 then
+    iterate
+    if verify(w1, '-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') > 0 then
+    iterate
+    /* PROC DIV paragraphs can be all-numeric. Skip those. */
+    if datatype(w1) == "NUM" then
+    iterate
+    name = space(w1 w2 w3)
+
+    if pos(' . ',d) > 0 then iterate
+
+    "(l1,l2) = Label" i
+    if l1 /= null then iterate /* skip as it has a label */
+
+    /* Trim any USING clause */
+    if pos('PROCEDURE DIVISION',name) > 0
+    then name = space(subword(name,1,2))
+
+    /* Remove all numerics and hyphens, then build label */
+    name = translate(name,' ',"0123456789-")
+    if words(name) > 1 then do
+      label = null
+      if length(space(name,0)) < 6
+      then label = space(name,0)
+      else do w = 1 to words(name)
+        label = label''left(word(name,w),1)
+      end w
+    end
+    else label = strip(left(name,5))
+    label = strip(left(translate(label),5))
+    if left(label,1) = 'Z' then do
+       label = 'A'substr(label,2)
+       end
+    if lab.label = 1 then call fixup_label
+
+    lab.label = 1
+    'label' i '= .'label 0
+    count = count + 1
+  end i
+
+  /* ------------------------------ *
+  | Done so tell the user and exit |
+  * ------------------------------ */
+DoneWithTheTask:
+  zedsmsg = null
+  zedlmsg = left(count 'labels created with' current' existing.',75),
+    left('Use command Savelab Li (or sl li) to list active labels.',75),
+    'Use command Savelab Save (or sl save) to save active labels which can' ,
+    'then be restored using the command Savelab.'
+  Address ISPExec ,
+    'Setmsg msg(isrz001)'
+  x = savelab('LI')
+
+Halt:
+  Exit 1
+
+Fixup_Label:
+  Select
+    When length(label) < 5 then do
+      c = 0
+      do forever
+        c = c + 1
+        tlab = label''substr(alpha,c,1)
+        if lab.tlab = 1 then iterate
+        label = tlab
+        return
+      end
+    end
+    Otherwise do
+      label = left(label,4)   /* get 4 chars from label */
+      c = 0
+      do forever  /* now add suffix to it */
+        c = c + 1
+        tlab = label''substr(alpha,c,1)
+        if lab.tlab = 1 then iterate
+        label = tlab
+        return
+      end
+
+    end
+  end
+  return
+
+  /* ------------------------------ *
+  | Get the list of current labels |
+  * ------------------------------ */
+Get_Labels:
+  "Locate Label First"
+  do while rc = 0
+    "(line) = Display_Lines"
+    "(l1,l2) = Label" line
+    if left(l1,3) = '.OA' then
+    "RESET LABEL" line line /* remove any compare labels */
+    l1 = strip(substr(l1,2))
+    lab.l1 = 1
+    current = current + 1
+    "Locate Label Next"
+  end
+  return
+
+  /* ---------------------------------- *
+  | Only used if variable has no value |
+  * ---------------------------------- */
+novalue:
+  say space(msgid.33 'NOVALUE raised for' condition('D') 'at line',
+    sigl 'in' s3)
+  exit 8

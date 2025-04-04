@@ -1,0 +1,81 @@
+        /* rexx exec */
+
+        Address ISREDIT MACRO
+        Address ISREDIT
+        "(SENDLINE) = LINENUM .ZLAST"
+        if sendline  = 0 then do
+                              "CANCEL"
+                              exit
+                              end
+
+        Address ISPEXEC "VGET (SENDID,SENDSUBJ,SENDSTMP) SHARED"
+        Address ISPEXEC "VGET (SENDFRM1,SENDFRM2,SENDFRM3,SENDCTR) PROFILE"
+        Address ISPEXEC "VGET (EPILOG1 EPILOG2 EPILOG3 EPILOG4 EPILOG5)",
+               "PROFILE"
+        Address ISPEXEC "VGET (EPILOG6 EPILOG7 EPILOG8 EPILOG9 EPILOG10)",
+               "PROFILE"
+        Address ISPEXEC "VGET (TMAILEPI)" PROFILE
+
+        "RECOVERY OFF"
+
+        "LINE_BEFORE .ZF = '    '"
+        subj = "Subject:" sendsubj
+        Address ISPEXEC "VPUT (SUBJ)"
+        "LINE_BEFORE .ZF = (SUBJ)"
+        "LINE_BEFORE .ZF = 'From:   " sendfrm1"'"
+
+        to   = sendid
+        from = sysvar(sysuid) "on" sendctr
+        "LINE_BEFORE .ZF =",
+             "'Sender: " from "'"
+        "LINE_BEFORE .ZF =",
+             "'To:     " to "'"
+        "LINE_BEFORE .ZF =",
+             "'Date:   " sendstmp "'"
+        "LINE_AFTER .ZL =",
+            " '         '"
+
+        /* do epilog */
+
+        "LINE_BEFORE .ZL = '    '"
+        "LINE_BEFORE .ZL = 'Signed: " sendfrm1"'"
+         if length(sendfrm3) > 0 then
+            "LINE_BEFORE .ZL = '         "sendfrm2"'"
+         if length(sendfrm2) > 0 then
+            "LINE_BEFORE .ZL = '         "sendfrm3"'"
+
+        if tmailepi = 'Y' then do
+          if length(epilog1) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog1"'"
+             end
+          if length(epilog2) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog2"'"
+             end
+          if length(epilog3) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog3"'"
+             end
+          if length(epilog4) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog4"'"
+             end
+          if length(epilog5) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog5"'"
+             end
+          if length(epilog6) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog6"'"
+             end
+          if length(epilog7) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog7"'"
+             end
+          if length(epilog8) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog8"'"
+             end
+          if length(epilog9) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog9"'"
+             end
+          if length(epilog10) > 0 then do
+             "LINE_BEFORE .ZL ='"epilog10"'"
+             end
+        end
+
+        "SAVE"
+        "END"

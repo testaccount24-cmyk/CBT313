@@ -1,0 +1,977 @@
+        /* ---------------------  rexx procedure  ---------------------- */
+        tmever = 2.10
+        /* Name:      TMAILSND                                           *
+         *                                                               *
+         * Function:  Transmit messages and files to TSO and non-TSO     *
+         *            systems.                                           *
+         *                                                               *
+         *            When directed to TSO systems then TSO TRANSMIT     *
+         *            is used.                                           *
+         *                                                               *
+         *            If non-TSO then the TSO/E PRINTDS command          *
+         *            is used with DEST(node.userid) SYSOUT(B)           *
+         *            NOTITLE specified.                                 *
+         *                                                               *
+         *            If sending a message data set that exceeds 80      *
+         *            bytes the transmission will occur sending the      *
+         *            message data set as a file as the TSO/E Transmit   *
+         *            command will not accept any MSGDS with greater     *
+         *            than LRECL=80.  Messages of this type will be      *
+         *            sent to VM/PROFS as files as I can find no other   *
+         *            means to do this process.                          *
+         *                                                               *
+         * Syntax:    %TMAILSND target-user-id(s) options                *
+         *                                                               *
+         *            valid options:                                     *
+         *                                                               *
+         *            DA(data-set-name) or                               *
+         *            DS(data-set-name) or                               *
+         *            DSN(data-set-name) or                              *
+         *            FILE(data-set-name)                                *
+         *                                                               *
+         *            DEBUG   - enable REXX tracing                      *
+         *                                                               *
+         *            NOMSG    - indicate sending file and no message    *
+         *            SENDFILE - sending only a file, no message         *
+         *                                                               *
+         *            MSG(dsn) - used to forward dsn as a message        *
+         *            SEQ      - send PDS member as sequential d/s       *
+         *                                                               *
+         *            MLOG     - Log the transmission                    *
+         *            MACK     - Request acknowledgement on receipt      *
+         *                                                               *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * Local Dependencies:                                           *
+         *                                                               *
+         *   Variables to change based upon your local environment:      *
+         *                                                               *
+         *   tso_nodes should contain a list of nje nodes that are       *
+         *             mvs/tso and thus will receive mail using the      *
+         *             tso transmit command                              *
+         *                                                               *
+         *   vio       defines the esoteric device name for temporary    *
+         *             work data used in this exec                       *
+         *                                                               *
+         *   use_sdb   Yes to use system determined blksize or           *
+         *             anything else to use a pre-defined blksize        *
+         *                                                               *
+         *   smtpnode  the name of the nje node where the smtp address   *
+         *             space is running                                  *
+         *                                                               *
+         *   smtpjob   the name of the smtp job name                     *
+         *                                                               *
+         *   center    must be the name of the currently active nje      *
+         *             node on which this exec is running.  This is      *
+         *             set in this exec using the SHOWTSO command.       *
+         *                                                               *
+         * History:                                                      *
+         *                                                               *
+         *    2.10    08/26/97 - support tso/e 2.5 sysvar(sysnode)       *
+         *                       and remove history from 1990            *
+         *    2.09    04/10/97 - support , as id separator               *
+         *    2.08    02/06/96 - fixed mail sent to message              *
+         *    2.07    02/06/96 - save version and minor reorder          *
+         *    2.06    04/12/95 - fix for various options                 *
+         *    2.05    03/10/95 - allow smtp jobname to be smtpx          *
+         *    2.04    02/21/95 - fix smtp mail to get id right           *
+         *    2.03    02/10/95 - fixup for Kaiser and add tmgetnod       *
+         *            to get the current nje node                        *
+         *    2.02    09/14/94 - fix for bill k.                         *
+         *    2.01    01/03/94 - remove wcc2 as a tso node               *
+         *    2.00    08/12/93 - fix for forward when lrecl < 80         *
+         *                       add version id for panel                *
+         *                                                               *
+         * ------------------------------------------------------------- *
+         *            Rexx exec to transmit messages and files           *
+         *            based upon TSO CLIST IDTFXMIT developed            *
+         *            by Mike Theys                                      *
+         * ------------------------------------------------------------- */
+
+        parse arg w1
+
+        Address ISPEXEC "CONTROL ERRORS RETURN"
+        Address ISPEXEC "VGET (ZAPPLID SENDCTR)"
+
+        if zapplid <> "MAIL" then do
+           cmd = sysvar(sysicmd)
+           Address ISPEXEC "SELECT CMD(%"cmd w1") NEWAPPL(MAIL)"
+           call exit_here 0
+        end
+
+        Address ISPEXEC "VPUT (TMEVER) SHARED"
+
+        /* ------------------------- *
+         * Get current node name     *
+         * ------------------------- */
+        if sysvar(systsoe) > "2040" then do            /* At v2.5 or higher? */
+           curnode = sysvar(sysnode)                   /* Use builtin func.  */
+           end
+        else do
+             "%tmgetnod"
+             Address ISPEXEC "VGet Curnode"
+             end
+
+        center = curnode
+        Sendctr = Center
+
+        /* set tso node defaults */
+        tso_nodes = "NKAISERA NKAISER1 NKAISER2 NKAISERN IBMMAIL",
+                    "EMC2NCAL"
+
+        /* set vio device type */
+        vio = "SYSVIO"
+
+        /* set System Determined Blksize */
+        use_sdb = "yes"
+
+        /* --------- SMTP Defaults  --------- */
+        smtpnode = center
+        smtpjob  = "SMTP"
+        smtphost = smtpnode".ncal.kaiperm.org"
+        /* ---------------------------------- */
+
+        /* -------------------------- *
+         * check for smtp job active  *
+         * -------------------------- */
+        st. = null
+        call outtrap "st."
+        "St" smtpjob
+        call outtrap "off"
+        if pos("EXECUTING",st.1) = 0 then do
+        /* -------------------------- *
+         * otherwise check for        *
+         * smtp and the 1 char sysid  *
+         * -------------------------- */
+           st. = null
+           call outtrap "st."
+           Address ISPEXEC "Vget ZSYSID"
+           "ST" smtpjob||left(zsysid,1)
+           call outtrap "off"
+           if pos("EXECUTING",st.1) > 0 then
+              smtpjob = smtpjob||left(zsysid,1)
+           end
+
+        pl = pos("(",w1)
+        pr = pos(")",w1)
+        if pl = 1 then do
+           wx = overlay(" ",w1,pl)
+           w1 = overlay(" ",wx,pr)
+           do until p1 = 0
+                p1 = pos(',',w1)
+                if p1 > 1 & p1 < pr then do
+                   pw = overlay(" ",w1,p1)
+                   w1 = pw
+                end
+           end
+        end
+
+        if length(sendctr) = 0 then
+           Address ISPEXEC "SELECT CMD(%TMAILDEF) NEWAPPL(MAIL)"
+
+        xw = w1
+        upper xw
+        erc = 0
+
+        if length(w1) > 0 then do
+             n = words(xw) /* retrieve number of words in the input */
+             x = word(xw,n) /* get the last word */
+             if x = "DEBUG" then do
+                trace i
+                y = delword(w1,n,5)  /* remove the word debug */
+                w1 = y /* reset w1 without the word debug in it */
+             end
+        end
+
+        /* set values to null to start with */
+        parse value "" with msgdsn filedsn msg1 msg2 outdd null
+
+        x = wordpos("SENDFILE",w1)
+        if x > 0 then do
+                      sendpanl = "TMAILSFL"
+                      wx = delword(w1,x,8)  /* remove SENDFILE */
+                      w1 = wx
+                      end
+                 else sendpanl = "TMAILSND"
+
+        x = wordpos("NOMSG",w1)
+        if x > 0 then do
+                      nomsg = "on"
+                      wx = delword(w1,x,5)
+                      w1 = wx
+                      end
+                 else nomsg = "off"
+
+        x = wordpos("MLOG",w1)
+        if x > 0 then do
+                      log = "Y"
+                      wx = delword(w1,x,5)
+                      w1 = wx
+                      end
+                 else log  = "N"
+
+        x = wordpos("MACK",w1)
+        if x > 0 then do
+                      ack = "Y"
+                      wx = delword(w1,x,5)
+                      w1 = wx
+                      end
+                 else ack  = "N"
+
+        x = wordpos("SEQ",w1)
+        if x > 0 then do
+                      seq = "SEQ"
+                      wx = delword(w1,x,3)
+                      w1 = wx
+                      end
+                 else seq = null
+
+        x = pos("MSG(",w1)
+        if x > 0 then do
+            y = substr(w1,x) /* truncate to put msg(..) as 1st word */
+            y = word(y,1) /* retrieve first word */
+            msgdsn = substr(y,5,length(y)-5)
+            w1 = overlay(" ",w1,x,length(y)," ")
+        end
+
+        x = pos("DS(",w1)
+        if x > 0 then do
+            y = substr(w1,x) /* truncate to put ds(..) as 1st word */
+            y = word(y,1) /* retrieve first word */
+            filedsn = substr(y,4,length(y)-4)
+            w1 = overlay(" ",w1,x,length(y)," ")
+        end
+
+        x = pos("DSN(",w1)
+        if x > 0 then do
+            y = substr(w1,x) /* truncate to put dsn(..) as 1st word */
+            y = word(y,1) /* retrieve first word */
+            filedsn = substr(y,4,length(y)-4)
+            w1 = overlay(" ",w1,x,length(y)," ")
+        end
+
+        x = pos("DA(",w1)
+        if x > 0 then do
+            y = substr(w1,x) /* truncate to put ds(..) as 1st word */
+            y = word(y,1) /* retrieve first word */
+            filedsn = substr(y,4,length(y)-4)
+            w1 = overlay(" ",w1,x,length(y)," ")
+        end
+
+        x = pos("FILE(",w1)
+        if x > 0 then do
+            y = substr(w1,x) /* truncate to put file(..) as 1st word */
+            y = word(y,1) /* retrieve first word */
+            filedsn = substr(y,6,length(y)-6)
+            w1 = overlay(" ",w1,x,length(y)," ")
+        end
+
+        if length(filedsn) > 0 then do
+        x = listdsi(filedsn)
+        if sysreason > 0 then do
+                    mailsmsg = "Error"
+                    maillmsg = "Requested data set" filedsn "does not exist"
+                    Address ISPEXEC "SETMSG MSG(MAIL000)"
+                    call exit_here 4
+                    end
+        if sysdsorg = "PO" then do
+           wx = sysdsn(filedsn)
+              if wx <> "OK" then do
+                       mailsmsg = "Error"
+                       maillmsg = "Requested data set" filedsn wx
+                       Address ISPEXEC "SETMSG MSG(MAIL000)"
+                       call exit_here 4
+                       end
+                    end
+        if sysdsorg = "PS" & seq = "SEQ" then seq = null
+                              end
+                              else seq = null
+
+        sendid = strip(w1)
+        upper sendid
+
+        Address ISPEXEC "VGET (ZSCREEN)"
+
+        if length(sendid) = 0 then call noid
+
+        if nomsg = "off" then do
+        /* generate a unique dd name based on the current ispf screen number */
+            if length(msgdsn) > 0 then do
+               call listdsi(msgdsn)
+               if sysdsorg <> "PS" then
+                  if pos("(",msgdsn) = 0 then do
+                     mailsmsg = null
+                     maillmsg = "Unable to send a PDS as a message." ,
+                                "Specified message dsn is:" msgdsn
+                     Address ISPEXEC "SETMSG MSG(MAIL000)"
+                     exit 4
+                     end
+               if length(sysrecfm) > 1 then do
+                  recfm = substr(sysrecfm,1,1)" "substr(sysrecfm,2,1),
+                          substr(sysrecfm,3,3)
+                  dcb = dcb "Recfm("strip(recfm)")"
+                  sysrecfm = recfm
+                  end
+               end
+               else
+                  syslrecl = 0
+
+            if left(sysrecfm,1) = "V" then
+               if syslrecl < 84 then
+                  syslrecl = 0
+            if syslrecl < 80 then
+                  parse value "80 11440 F B" with syslrecl sysblksize sysrecfm
+
+            dcb = "Lrecl("syslrecl") Blksize("sysblksize")",
+                  "Recfm("strip(sysrecfm)")"
+
+            if use_sdb = "yes" then sysblksize = 0
+
+            xmitdd = "XMITMSG"zscreen
+            "ALLOC FI("xmitdd") REUSE",
+            "RECFM("sysrecfm") LRECL("syslrecl") BLKSIZE("sysblksize")",
+            "DSORG(PS) SPACE(15 90) TRACK NEW KEEP UNIT("vio")"
+
+        if length(msgdsn) > 0 then do
+            msgdd = 'MSG'zscreen
+            "ALLOC F("msgdd") SHR DS("msgdsn") REUSE"
+            "EXECIO * DISKR " msgdd " (FINIS STEM msg."
+            "EXECIO * DISKW " xmitdd " (FINIS STEM msg."
+            "FREE F("msgdd")"
+        end
+
+        Address ISPEXEC "LMINIT DATAID(XMITED) DDNAME("xmitdd")"
+
+        sendstmp = left(date('W'),3)',' date(),
+                   time('n')
+        Address ISPEXEC "VPUT (SENDSTMP,SENDID,SENDCTR) SHARED"
+        Address ISPEXEC "VGET (SENDFRM1) PROFILE"
+
+        if length(sendfrm1) = 0 then do
+            Address ISPEXEC "SELECT CMD(%TMAILDEF)"
+        end
+
+        Address ISPEXEC "VGET (FWD SENDSUBJ)"
+
+        save_fwd = fwd
+
+        if length(msgdsn) = 0 then do
+           fwd = null
+           end
+
+        if fwd <> "YES" then
+                Address ISPEXEC,
+               "EDIT DATAID("xmited") PANEL(TMAILEDT) MACRO(TMAILEDM)",
+               "PROFILE(TSOMAIL)"
+             else
+                Address ISPEXEC,
+                 "EDIT DATAID("xmited") PANEL(TMAILEDT) MACRO(TMAILEDM)",
+                 "PROFILE(TSOMAIL)"
+           Address ISPEXEC "VGET (MAILEND)"
+           if mailend = "CANCEL" then rc = 4
+
+           fwd = save_fwd
+
+        edrc = rc
+        erc = edrc
+        if erc = 4 then call exit_here 4
+        end /* end of processing for building the message */
+        else do
+             call redo
+             Address ISPEXEC "SETMSG MSG(MAIL000)"
+             if datatype(erc) <> "NUM" then erc = 0
+             call exit_here erc
+             end
+
+        if edrc = 0 then do
+            x = PROMPT("OFF")
+            x = MSG("ON")
+            /* Add on the subject and date/time stamp */
+            Address ISPEXEC,
+              "EDIT DATAID("xmited") MACRO(TMAILEDX)",
+                 "PROFILE(TSOMAIL)"
+            xerc = rc /* XERC=4 NOTHING SAVED */
+            if xerc = 0 then call redo
+        else do
+            mailsmsg = "No message"
+            maillmsg = "No Transmit message for" sendid". Transmit aborted."
+            erc = 4
+            edrc = 4
+        end
+        end
+        else if edrc = 4 then do /* nothing saved. xmit msg cancelled */
+            mailsmsg = "Message cancelled"
+            maillmsg = "The Transmit message to" sendid "was aborted."
+            erc = 4
+            end
+        else do
+        mailsmsg = "Edit error"
+        maillmsg = "An unexpected error occurred in Transmit Edit.",
+            " Message cancelled."
+            erc = 4
+            end
+        Address ISPEXEC "SETMSG MSG(MAIL000)"
+        x = MSG("OFF")
+        "FREE FI("xmitdd")"
+        Address ISPEXEC "LMFREE DATAID("xmited")"
+        /* end */
+        if length(erc) = 0 then erc = 0
+        call exit_here erc
+
+        Noid:
+             Address ISPEXEC "SELECT PANEL("sendpanl")"
+             call exit_here erc
+
+        REDO:
+           x = outtrap("TRAP","*","NOCONCAT")
+           if log = "N" then mlog = "NOLOG"
+           else mlog = null
+           if ack = "Y" then mack = NOTIFY
+               else mack = "NONOTIFY"
+           if nomsg = "off" then do
+           call fix_nick sendid
+           fix_nick_status = "on"
+           if syslrecl > 80 then do
+              tnick.tso = tnick.tso
+              end
+           xmrc = rc
+           if xmrc > 0 then call cancel
+             if length(tnick.tso) > 0 then do
+                if syslrecl = 80 then
+                "TRANSMIT ("tnick.tso") MSGDD("xmitdd") NOPROLOG NOEPILOG",
+                             mlog mack
+                else
+                "TRANSMIT ("tnick.tso") FILE("xmitdd") NOPROLOG NOEPILOG",
+                             mlog mack
+                /* prevent duplicate logging under VM */
+                xmrc = rc
+                if mlog = null then mlog = "NOLOG"
+                end
+             if length(tnick.smtp) > 0
+                then do i = 1 to words(tnick.smtp)
+                     smtpid = word(tnick.smtp,i)
+                     Address ISPEXEC "VPUT (SMTPID SMTPHOST) SHARED"
+                     Address ISPEXEC,
+                      "EDIT DATAID("xmited") MACRO(TMAILESM)",
+                      "PROFILE(TSOMAIL)"
+                      call sendtovm xmitdd smtpnode"."smtpjob  syslrecl,
+                           sysblksize sysrecfm
+                     xmrc = rc
+                     if mlog = null then mlog = "NOLOG"
+                     end
+             if length(tnick.inet) > 0
+                then do i = 1 to words(tnick.inet)
+                     smtpid = word(tnick.inet,i)
+                     Address ISPEXEC "VPUT (SMTPID SMTPHOST) SHARED"
+                     Address ISPEXEC,
+                      "EDIT DATAID("xmited") MACRO(TMAILESM)",
+                      "PROFILE(TSOMAIL)"
+                      if syslrecl > 80 then
+                        "TRANSMIT INET.VM-SMTP FILE("xmitdd")",
+                        "NOPROLOG NOEPILOG" mlog mack
+                      else
+                        "TRANSMIT INET.VM-SMTP MSGDD("xmitdd")",
+                        "NOPROLOG NOEPILOG" mlog mack
+                     xmrc = rc
+                     if mlog = null then mlog = "NOLOG"
+                     end
+             if length(tnick.vm) > 0
+                then do i = 1 to words(tnick.vm)
+                     parse value word(tnick.vm,i) with tonode "." toid
+                     Address ISPEXEC "VGET (TSOLOG) SHARED"
+                     Address ISPEXEC "VPUT (ACK TONODE TOID SENDCTR) SHARED"
+                     Address ISPEXEC,
+                      "EDIT DATAID("xmited") MACRO(TMAILEPF)",
+                      "PROFILE(TSOMAIL)"
+                      call sendtovm xmitdd word(tnick.vm,i) syslrecl,
+                           sysblksize sysrecfm
+                     if mlog = null then call do_vmlog
+                     /* prevent duplicate logging under VM */
+                    if mlog = null then mlog = "NOLOG"
+                     end
+           msg1 = "Message"
+           msg2  = "A TSO Mail message was sent to"
+           erc = 0
+
+                    end
+                    else xmrc = 0
+           if length(filedsn) > 0 then do
+           if fix_nick_status <> "on" then
+              call fix_nick sendid
+           if rc > 0 then call cancel
+              send_file = null
+              if words(tnick.tso) > 0 then send_file = tnick.tso
+              if words(tnick.vm)  > 0 then send_file = send_file tnick.vm
+              if words(send_file) > 0 then do
+                 "TRANSMIT ("send_file") DS("filedsn")" mlog mack seq
+                  if nomsg = "off" then msg1 = "Message and File"
+                                   else msg1 = "File"
+                  if nomsg = "off" then
+                                   msg2 = "A TSO Mail message and data set",
+                                           filedsn
+                                   else msg2 = "File" filedsn
+              end
+              if words(tnick.smtp) > 0 then
+                 Address ISPEXEC "DISPLAY PANEL(TMAILSFE)"
+           end
+           x = outtrap("OFF")
+           if xmrc = 0 then do
+               mailsmsg = msg1 "sent"
+               maillmsg = msg2 sendid
+           end
+           else do
+               mailsmsg = "Transmit error"
+               maillmsg = "An unexpected error occurred in Transmit. RC="xmrc
+               erc = 4
+               if trap.0 > 0 then maillmsg = trap.1
+               Address ISPEXEC "DISPLAY PANEL(TMAILRDO)"
+               if rc = 0 THEN signal redo
+           end
+           filedsn = null
+           return
+
+        do_vmlog:
+           if vm_log = "on" then return
+           if sysdsn("'"tsolog"'") = "OK" then
+              "ALLOC F(TSOLOG"zscreen") DS('"TSOLOG"') MOD"
+              else
+              "ALLOC F(TSOLOG"zscreen") DS('"TSOLOG"') NEW",
+                 "SPACE(1,1) TRACKS RECFM(V B) LRECL(255) BLKSIZE(3120)"
+            "EXECIO * DISKR" xmitdd "(FINIS STEM m."
+               mv.0 = 4
+               mv.1 = substr("-",1,79,"-")
+               date = date()
+               upper date
+               if substr(date,2,1) = ' ' then date = '0'date
+               mv.2 = left("TRANSMIT",16)left("**MESSAGE**",46)date time()
+               mv.3 = left(" TO:",16)left(tonode,8) toid
+               mv.4 = " Specified users:" word(tnick.vm,1)
+               do ivm = 2 to words(tnick.vm) by 2
+                  mv.0 = mv.0 + 1
+                  c = mv.0
+                  mv.c = "                 " word(tnick.vm,ivm),
+                         "      " word(tnick.vm,ivm+1)
+                  end
+               mv.0 = mv.0 + 1
+               c = mv.0
+               mv.c = "   "
+            do ivm = 2 to m.0
+               mv.0 = mv.0 + 1
+               c = mv.0
+               mv.c = m.ivm
+               end
+               mv.0 = mv.0 - 1  /* bypass Profs trailer record */
+            "EXECIO" mv.0 "DISKW TSOLOG"zscreen "(FINIS STEM mv."
+            "FREE F(TSOLOG"zscreen")"
+            vm_log = "on"
+            return
+
+        cancel:
+            mailsmsg = "Message cancelled"
+            maillmsg = "The Transmit message to" sendid "was aborted."
+            Address ISPEXEC "SETMSG MSG(MAIL000)"
+            call exit_here 4
+
+        fix_nick:
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      Fix_Nick                                           *
+         *                                                               *
+         * Function:  Perform Nick Name validation for the TSO/E         *
+         *            Mail dialog.                                       *
+         *                                                               *
+         * Syntax:   call fix_nick sendid                                *
+         *                                                               *
+         *           ISPF Panels used are:                               *
+         *           TMAILNV                                             *
+         *                                                               *
+         *           This rexx procedure is imbedded within              *
+         *           the TMAILSND REXX procedure.                        *
+         *                                                               *
+         * History:                                                      *
+         *            04/10/97 - Support ',' as separation field         *
+         *            08/29/90 - Creation of procedure                   *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        arg nick_names
+
+        orig_names = nick_names
+
+        start_over:
+
+        /* strip out the commas */
+        nick_names = translate(nick_names," ",",")
+
+        w = words(nick_names)
+
+        do i = 1 to w
+           nick_in.i = word(nick_names,i)
+           if pos("@",nick_in.i) = 0 then do
+           if pos(".",nick_in.i) > 0 then do
+              parse value nick_in.i with node "." userid
+              if length(userid) > 8 then do
+                 wl = length(userid)
+                 wo = wordindex(nick_names,i)
+                 new_nick = overlay(nick_in.i,nick_names,wo,wl)
+                 nick_names = new_nick
+                 nick_in.i = node"."left(userid,8)
+                 end
+              end
+           else if length(nick_in.i) > 8
+                   then do
+                     if pos("@",nick_in.i) = 0 then do
+                        userid = left(nick_in.i,8)
+                        wl = length(nick_in.i)
+                        wo = wordindex(nick_names,i)
+                        new_nick = overlay(userid,nick_names,wo,wl)
+                        nick_names = new_nick
+                        nick_in.i = userid
+                        end
+                   end
+           end
+        end
+
+        nick_in.0 = w
+
+        call tstnick nick_names
+
+        parse value null with inv. tnames
+        parse value "0" with inv.0
+
+        do i = 1 to tnick.0
+           do j = 1 to nick_in.0
+              if wordpos(nick_in.j,substr(tnick.i,1,20)) > 0
+                 then do
+                      call test_node
+                      nick_in.j = null
+                      tnick.i = null
+                      end
+              if left(tnick.i,1) = "*" then
+                 if strip(substr(tnick.i,2,9)) = strip(nick_in.j)
+                    then do
+                    if left(tnick.i,2) <> "**" then do
+                          nick_in.j = null
+                          tnick.i   = null
+                          end
+                    end
+              end
+        end
+
+        do i = 1 to tnick.0
+           if length(tnick.i) > 0 then do
+                       call test_node
+                       tnick.i = null
+                       end
+           end
+
+        do j = 1 to nick_in.0
+           if nick_in.j <> null then
+              call set_inv
+              end
+
+        do i = 1 to inv.0
+           x = wordpos(inv.i,orig_names)
+           if x = 0 then iterate
+           w = delword(orig_names,x,1)
+           orig_names = w
+           tnames = tnames inv.i
+           end
+
+        if inv.0 > 0 then do
+            Address ISPEXEC "DISPLAY PANEL(TMAILNV)"
+              if rc > 4 then return 8
+              nick_names = orig_names tnames
+              orig_names = nick_names
+              signal start_over
+              end
+
+        return tnick.
+
+        /* ------------------------------------------------------------- */
+        /*  This section will validate a node as either TSO or no-TSO If */
+        /*  a node is not in the list then the default is to set it to   */
+        /*  VM.                                                          */
+        /* ------------------------------------------------------------- */
+        test_node:
+        /* first bypass nicknames/lists */
+        if left(tnick.i,1) = "*" then
+           if left(tnick.i,2) <> "**" then return
+
+        /* test for internet addresses (@) */
+        Select
+          When pos("@",tnick.i) > 0 then call set_smtp
+          When pos(".",word(tnick.i,2)) > 0 then call set_smtp
+          When wordpos(word(tnick.i,2),tso_nodes) > 0 then
+                    call set_tso
+          Otherwise call set_vm
+        end
+        return
+
+        set_inv:
+           x = pos(".",nick_in.j)
+           select
+           when pos("@",nick_in.j) > 0 then do
+                    tnick.0 = tnick.0 + 1
+                    i = tnick.0
+                    tnick.i = left("********",10) nick_in.j
+                    call test_node
+                    end
+           when x = 0 then do
+                    inv.0 = inv.0 + 1
+                    c = inv.0
+                    inv.c = nick_in.j
+                    end
+           when x > 0 then do
+                    parse value nick_in.j with node "." userid
+                    tnick.0 = tnick.0 + 1
+                    i = tnick.0
+                    tnick.i = left("********",10) left(node,10) userid
+                    call test_node
+                    end
+           otherwise nop;
+           end
+        return
+
+        set_tso:
+           new_nick  =  word(tnick.i,2)"."word(tnick.i,3)
+           if wordpos(new_nick,tnick.tso) > 0 then return
+           tnick.tso = tnick.tso word(tnick.i,2)"."word(tnick.i,3)
+           return
+
+        set_vm:
+           new_nick  =  word(tnick.i,2)"."word(tnick.i,3)
+           if wordpos(new_nick,tnick.vm) > 0 then return
+           tnick.vm  = tnick.vm  new_nick
+           return
+
+        set_smtp:
+           if pos("@",tnick.i) > 0 then
+              new_nick = word(tnick.i,2)
+              else new_nick = word(tnick.i,3)"@"word(tnick.i,2)
+           if pos('C=',word(tnick.i,2)) > 0 then do
+              if wordpos(new_nick,tnick.inet) = 0 then
+                 tnick.inet = tnick.inet new_nick
+              end
+           else do
+                if wordpos(new_nick,tnick.smtp) = 0 then
+                   tnick.smtp = tnick.smtp new_nick
+                end
+           return
+
+        tstnick: procedure expose tnick.
+
+        arg nick_names
+
+        parse value "" with null
+
+        nick.  = null
+        nick.0 = 0
+        tnick.  = null
+        tnick.0 = 0
+
+        nick_name.  = null
+        nick_node.  = null
+        nick_id.    = null
+        nick_name.0 = 0
+
+        logsel  = null
+        logname = null
+
+        /* ------------------------------------------------------------- */
+        /*  Allocate a NAMES.TEXT for the user if they do not have one   */
+        /*  as we will use it in the nick name management dialog.        */
+        /* ------------------------------------------------------------- */
+        if sysdsn("NAMES.TEXT") <> "OK" then do
+           new_names_dd = "NN"random()
+           "ALLOC DS(NAMES.TEXT) NEW SPACE(1,1) TRACKS RECFM(F B)",
+                 "F("new_names_dd") BLKSIZE(6160)"
+           "EXECIO 1 DISKW" new_names_dd "(FINIS STEM nick."
+           "FREE F("new_names_dd")"
+        end
+
+        nick_file = sysvar(syspref)".NAMES.TEXT"
+        signal get_nick
+
+        nick_loop:
+                do i = 1 to nick.0
+                   name = strip(nick.i)
+                   upper name
+                   if logsel = null then do
+                      if pos(":LOGSEL.",name) > 0 then do
+                         parse value name with ":LOGSEL." logsel x
+                         nick.i = null
+                         end
+                      end
+                   if logname = null then do
+                      if pos(":LOGNAME.",name) > 0 then do
+                         parse value name with ":LOGNAME." logname x
+                         nick.i = null
+                         end
+                      end
+                   if left(name,8) = ":ALTCTL." then do
+                          parse value name with ":ALTCTL." nick_file
+                          nick.i = " "
+                          signal get_nick
+                          end
+                 end
+
+        if logsel  = null then logsel = "LOG"
+        if logname = null then logname = "MISC"
+
+        tsolog = sysvar(syspref)"."logsel"."logname
+        Address ISPEXEC "VPUT (TSOLOG) SHARED"
+        list_opt = 0
+
+        one_more_time:
+        i_count = 1
+
+        do_it:
+           if list_opt = 0 then do
+              parse value null with do_nick do_node do_id
+              end
+              else list_opt = 0
+        do i = i_count to nick.0
+           temp = nick.i
+           upper temp
+           parse value temp with ":NICK." temp_name more
+              if length(temp_name) > 0 then do
+                 current_nick = temp_name
+                 if length(do_nick) > 0 then do
+                    if wordpos(do_nick,nick_names) = 0 then do
+                          parse value null with do_nick do_node do_id
+                          do_nick = word(temp_name,1)
+                          end
+                    else do
+                         in = nick_name.0 + 1
+                         nick_name.0 = in
+                         nick_name.in = do_nick
+                         nick_node.in = do_node
+                         nick_id.in   = do_id
+                         wi = wordindex(nick_names,wordpos(do_nick,nick_names))
+                         wo = overlay(" ",nick_names,wi,length(do_nick))
+                         nick_names = wo
+                         if words(nick_names) = 0 then leave
+                         parse value null with do_nick do_node do_id
+                         end
+                    end
+                 do_nick = word(temp_name,1)
+                 end
+           parse value temp with ":NODE." temp_node more
+             if length(temp_node) > 0 then do
+                do_node = word(temp_node,1)
+                parse value do_node with do_node ":" more
+                end
+           parse value temp with ":USERID." temp_id more
+             if length(temp_id) > 0 then do_id = word(temp_id,1)
+           parse value temp with ":INTERNET." temp_id more
+             if length(temp_id) > 0 then do
+                do_id = word(temp_id,1)
+                do_node = ''
+                end
+           parse value temp with ":LIST." nick_list
+             if length(nick_list) > 0 then
+                if wordpos(current_nick,nick_names) > 0 then do
+                   wo = wordpos(current_nick,nick_names)
+                   wi = wordindex(nick_names,wo)
+                   wn = delword(nick_names,wo,1)
+                   nick_names = wn nick_list
+                    in = nick_name.0 + 1
+                    nick_name.0 = in
+                    nick_name.in = "*"current_nick
+                   list_opt = 1
+                   il = i + 1
+                   if il <= nick.0 then do
+                      t_list = nick.il
+                      upper t_list
+                      If pos(":LIST.",t_list) > 0 & pos(":NICK.",t_list) = 0
+                         then do
+                         i = i + 1
+                         parse value t_list with ":LIST." nick_list
+                         nick_names = nick_names nick_list
+                         end
+                      end
+                   end
+           end
+           if length(do_nick) > 0 then do
+              if wordpos(do_nick,nick_names) > 0 then do
+                    in = nick_name.0 + 1
+                    nick_name.0 = in
+                    nick_name.in = do_nick
+                    nick_node.in = do_node
+                    nick_id.in   = do_id
+                    wi = wordindex(nick_names,wordpos(do_nick,nick_names))
+                    wo = overlay(" ",nick_names,wi,length(do_nick))
+                    nick_names = wo
+                    end
+              end
+              if list_opt = 1 then signal one_more_time
+
+        do i = 1 to nick_name.0
+           tnick.0 = tnick.0 + 1
+           t = tnick.0
+           if pos("@",nick_id.i) = 0 then
+             tnick.t = left(nick_name.i,10) strip(nick_node.i),
+                       left(nick_id.i,8)
+           else
+             tnick.t = left(nick_name.i,10) left(nick_node.i,10) nick_id.i
+           end
+
+        return tnick.
+
+
+        get_nick:
+
+        if sysdsn("'"nick_file"'") <> "OK" then signal nick_loop
+
+        x = msg("off")
+            s = time("L")  /* get the current time hh:mm:ss.th */
+            t = substr(s,1,2)substr(s,4,2)substr(s,7,2)substr(s,10,1)
+            suf = "F"t
+
+        "ALLOC F("suf") DS('"nick_file"') SHR"
+        "EXECIO * DISKR" suf "(FINIS STEM n."
+        "FREE F("suf")"
+
+        x= msg("on")
+
+        do i = 1 to n.0
+           if left(n.i,1) <> "*" then do
+              nick.0 = nick.0 + 1
+              j = nick.0
+              nick.j = n.i
+              end
+           end
+
+        signal nick_loop
+
+        sendtovm: procedure expose smtpjob
+        /* --------------------------------------------------------------- */
+        /* Perform the sysout operation to punch to non-TSO node locations */
+        /* --------------------------------------------------------------- */
+
+        arg indd toid syslrecl sysblksize sysrecfm
+        if length(outdd) = 0 then
+           outdd = "O"random()
+
+        if left(sysrecfm,1) = "F" then sysblksize = syslrecl
+
+        "ALLOC F("outdd") SYSOUT(B) DEST("toid") Reuse",
+             "Recfm("sysrecfm") Lrecl("syslrecl") Blksize("sysblksize")"
+
+        "EXECIO * DISKR" indd "(FINIS STEM in."
+        "EXECIO * DISKW" outdd "(FINIS STEM in."
+        "FREE F("outdd")"
+
+        return
+        Exit_Here:
+        arg value
+        if length(value) = 0 then value = 0
+        if fwd <> "NEVER" then fwd = "No"
+        Address ISPEXEC "VPut FWD"
+        Exit value

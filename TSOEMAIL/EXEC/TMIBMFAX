@@ -1,0 +1,44 @@
+        /* rexx */
+        Address ISREDIT
+        "MACRO NOPROCESS"
+
+        Address ISPEXEC "Display Panel(TMIBMFAX)"
+        if rc > 0 then exit
+
+        line = 0
+
+        Address ISREDIT
+        "LINE_After" line "= '/BA'"
+            line = line + 1
+        "LINE_After" line "= '/AK                  '"
+            line = line + 1
+        "LINE_After" line "= '/From" faxf1  "'"
+            line = line + 1
+        if length(faxf2) > 0 then call insert faxf2
+        if length(faxf3) > 0 then call insert faxf3
+        if length(faxf4) > 0 then call insert faxf4
+        if length(faxf5) > 0 then call insert faxf5
+        if length(faxf6) > 0 then call insert faxf6
+        if length(faxf7) > 0 then call insert faxf7
+        if length(faxf8) > 0 then call insert faxf8
+        "LINE_After" line "= '/Fax" faxphone   "C=1'"
+            line = line + 1
+        "LINE_After" line "= '/To  " faxt1  "'"
+            line = line + 1
+        if length(faxt2) > 0 then call insert faxt2
+        if length(faxt3) > 0 then call insert faxt3
+        if length(faxt4) > 0 then call insert faxt4
+        if length(faxt5) > 0 then call insert faxt5
+        if length(faxt6) > 0 then call insert faxt6
+        if length(faxt7) > 0 then call insert faxt7
+        if length(faxt8) > 0 then call insert faxt8
+        "LINE_After" line "= '/Subject" faxsub    "'"
+            line = line + 1
+        "LINE_After" line "= '/EA                  '"
+
+        exit 0
+        Insert:
+        arg data
+        "LINE_After" line "= '"data "'"
+            line = line + 1
+            return

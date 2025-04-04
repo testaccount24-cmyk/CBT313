@@ -1,0 +1,22 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬DEFAULT`command will display a panel upon which certain required
+`      variables must be filled in by the user.  This panel will be displayed
+`      the first time it is required and may be selected specifically to
+`      change the defaults at any time.
+`
+`      Syntax: ¬DEFAULT
+`
+`      Note:   ¬DEFAULT`can be abbreviated to¬DEF.
+)End

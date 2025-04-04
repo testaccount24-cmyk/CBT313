@@ -1,0 +1,31 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(left ) color(white)
+   ¦ type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(right) color(white)
+         hilite(uscore)
+   ~ type(text) intens(high) caps(off) just(asis ) color(white)
+         hilite(uscore)
+)Body
++--------------------------% TSO/E-Mail Processing +----------------------------
+%
+%
+%
+%
+%              Your~TSO/E-MAIL%is now being processed for¬userid  %
+
+
+
+%                              Please be patient
+
+
+
+%                       Messages Processed: `mcount%
+
+                           Files Processed: `fcount%
+)Init
+)Proc
+)End

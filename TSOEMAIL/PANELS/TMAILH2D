@@ -1,0 +1,37 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+%
+%
+`      The¬Select`option will display a selection menu of the options that
+`      are provided for processing the received data set.  This option can
+`      be specified in the selection field by entering¦S.n`where¦n`is one
+`      of the available options.
+`
+`      The options available are:
+`
+¦      0 -¬Read the message that accompanied this data set
+¦      1 -¬Browse the data set
+¦      2 -¬Edit the data set
+¦      3 -¬Print the data set
+¦      4 -¬Rename the data set
+¦      5 -¬Copy the data set
+¦      6 -¬Use the PDS command to process the data set
+¦      7 -¬Delete the data set
+¦      8 -¬Unterse a data set received from IBMLINK
+¦      9 -¬Forward the data set to another user
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 0,tmailh3a   1,*tmailh3a  2,*tmailh3a  3,tmailh3b
+                      4,*tmailh3b  5,*tmailh3b  6,tmailh3c
+                      7,*tmailh3c  8,*tmailh3c  9,*tmailh3d *,?)
+)End

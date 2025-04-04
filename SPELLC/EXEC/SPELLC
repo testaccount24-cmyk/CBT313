@@ -1,0 +1,769 @@
+/* --------------------  rexx procedure  -------------------- */
+ ver = "2.4"
+/* Name:      SPELLC                                          *
+ *                                                            *
+ * Function:  Spell Check ISPF Edit Macro                     *
+ *                                                            *
+ * Syntax:    SPELLC                                          *
+ *            or                                              *
+ *            SPELLC start-line stop-line                     *
+ *            or                                              *
+ *            SPELLC start-label stop-label                   *
+ *                                                            *
+ *            An alternate way to specify a range of lines    *
+ *            to check is to use a S followed by a            *
+ *            number (e.g. S9) to check 9 lines or            *
+ *            a pair of SSs to mark a range.                  *
+ *                                                            *
+ * Author:    Lionel B. Dyck                                  *
+ *                                                            *
+ * Input:     ISPF Edit data set                              *
+ *            List of words (data set)                        *
+ *            Optional user dictionary (from popup panel)     *
+ *                                                            *
+ * Custom:    Look in the SPELLCDF exec for customizations    *
+ *                                                            *
+ * History:                                                   *
+ *            06/27/22 - 2.4                                  *
+ *                     - Add comma to public word count       *
+ *            05/12/17 - 2.3                                  *
+ *                     - Add missing Otherwise to Select      *
+ *            05/10/17 - 2.3                                  *
+ *                     - Add / to be translated to blank      *
+ *            11/03/04 - 2.2                                  *
+ *                     - Add test to verify running as edit   *
+ *                       macro                                *
+ *            08/12/04 - 2.1                                  *
+ *                     - Add sub_novalue subroutine           *
+ *            06/17/04 - 2.0                                  *
+ *                     - Check spellcdf panelloc value        *
+ *                       if null call spellcpn exec to load   *
+ *                       ispf panels                          *
+ *            05/22/04 - 1.9                                  *
+ *                     - Add line range support using either  *
+ *                       S<n> or SS                           *
+ *            05/21/04 - 1.8                                  *
+ *                     - Correction if labels are separated   *
+ *                       by more than 1 space thx to Asher    *
+ *            05/17/04 - 1.7                                  *
+ *                     - Correction if ' in a misspelled word *
+ *            05/14/04 - 1.6                                  *
+ *                     - Several enhancements by Asher        *
+ *                       Aremband to place messages near      *
+ *                       where lines are checked.             *
+ *            05/10/04 - 1.5                                  *
+ *                     -  nls enhancements by Hartmut         *
+ *                     -  add option to ignore words in caps  *
+ *                     -  add routine by Asher Aremband to    *
+ *                        handle words with /                 *
+ *                     -  minor cleanup of the code/comments  *
+ *                     - remove trailing periods from words   *
+ *                     -  change display interval for popup   *
+ *                        progress based on file size thx     *
+ *                        to Asher Aremband.                  *
+ *            05/05/04 - 1.4                                  *
+ *                     -  bug fix                             *
+ *            05/04/04 - 1.3                                  *
+ *                     -  change progress display to every    *
+ *                        fifth line to reduce overhead       *
+ *                     -  change from msgline to infoline     *
+ *                        as msgline is limited to 72 chars   *
+ *                     -  do a shift left max to start with   *
+ *                     -  add progress popup option           *
+ *                     -  revised return from spellcdf for    *
+ *                        nls support in the future by        *
+ *                        hartmut beckmann                    *
+ *                     -  add elapsed time counter from       *
+ *                        John Kalinich                       *
+ *                     -  ...ove data set name from messages  *
+ *                     -  ...cess and ignore user dictionary  *
+ *                        Call Elapsed_Timeme passed from     *
+ *                        SPELLCDF                            *
+ *            05/03/04 - 1.2                                  *
+ *                     -  move alpha, from and other to       *
+ *                        SPELLCDF                            *
+ *            05/02/04 - 1.1                                  *
+ *                     -  change invalid word message line to *
+ *                        a line with *'s under the bad word  *
+ *                     -  change 1st message line into 2      *
+ *                     -  exclude all and display lines with  *
+ *                        invalid words                       *
+ *            04/30/04 - 1.0                                  *
+ *                     -  redesignate as release 1.0          *
+ *            04/30/04 - 0.6                                  *
+ *                     -  move test for 1st char alpha        *
+ *            04/30/04 - 0.5                                  *
+ *                     -  correction for passed labels        *
+ *            04/29/04 - 0.4                                  *
+ *                     - Move local customizations to spellcdf*
+ *                     - Translate out more special chars     *
+ *                     - Display private and public words     *
+ *                     - Allow a line range to be specified   *
+ *                       using line labels or lines numbers   *
+ *                     - Increase to 6 the words on the       *
+ *                       invalid summary line                 *
+ *                     - Correction to catch words like       *
+ *                       "this is a txxt".                    *
+ *            04/28/04 - 0.3                                  *
+ *                     - Correct message is all spells ok     *
+ *                     - Remove special chars from end of word*
+ *            04/27/04 - 0.2                                  *
+ *                     - add custom variable email to         *
+ *                       be the e-mail address to send new    *
+ *                       word additions.                      *
+ *                     - do not remove . from words           *
+ *                     - add . to list of chars to ignore     *
+ *                     - allow user to cancel with PF3        *
+ *                     - save user dictionary variable in     *
+ *                       ISPF Profile                         *
+ *            04/26/04 - Creation                             *
+ *                                                            *
+ * ---------------------------------------------------------- */
+ signal on novalue name sub_novalue
+
+/* --------------------- *
+ * Setup the Environment *
+ * --------------------- */
+ Address ISRedit
+ "Macro (range) NOPROCESS"
+ if rc > 0 then do
+    say "Error. The SPELLC command is an ISPF Edit Command"
+    say "       and *NOT* a TSO command. It must be executed"
+    say "       from the ISPF Edit command line thus:"
+    say "       "
+    say "       Command ===> SPELLC"
+    say "       "
+    say "Exiting...."
+    exit 16
+    end
+ "Left max"
+ "(dataset) = dataset"
+ "(member)  = member"
+ trail      = "."
+ errors     = 0
+ total      = 0
+ invalidw   = 0
+ private    = 0
+ public     = 0
+ parse value "" with null invalid invalid. ,
+                word.
+ zerralrm = "YES"
+ zerrhm   = "*"
+ save_load = null
+
+/* ---------------------------------------- *
+ * Define Errors to return to us to process *
+ * ---------------------------------------- */
+ Address ISPExec "Control Errors Return"
+
+/* ------------------------------ *
+ * Get the defaults from SPELLCDF *
+ * ------------------------------ */
+ call spellchk_defaults
+ call parse_defaults
+
+/* --------------------------------- *
+ * Now build the panels into storage *
+ * --------------------------------- */
+ if panelloc = null then
+    save_load = spellcpn()
+
+/* --------------------------------- *
+ * Get the last line in the data set *
+ * --------------------------------- */
+ "(last) = linenum .zl"
+ last = last + 0
+
+/* ------------------------------------------------------ *
+ * Check for passed line range.                           *
+ * If only one label passed then it is the starting point *
+ * and all lines from that point will be checked.         *
+ * If not a label then must be a line number.             *
+ * ------------------------------------------------------ */
+ parse value "" with start stop
+ if length(range) > 0 then do
+    parse value range with start stop .
+    stop = strip(stop)
+    if left(start,1) = "."
+       then "(start) = Linenum" start
+    if left(stop,1)  = "."
+       then "(stop)  = Linenum" stop
+    end
+ if start = null then start = 1
+ if stop  = null then stop = last
+ /* Now remove leading zeros */
+ stop  = stop + 0
+ start = start + 0
+
+/* ---------------- *
+ * Test for a Range *
+ * ---------------- */
+ "PROCESS RANGE S"
+ prc = rc
+ "(cmd) = range_cmd"
+ if cmd <> null then do
+    if prc > 3 then do
+         Address ISPExec
+         "SetMsg Msg(isrz002)"
+          call clean_up 8
+       end
+    if prc = 0 then do
+       if range <> null then do
+          zerrsm = "Error"
+          zerrlm = "SPELLC is confused as you've" ,
+                   "asked to use both a range" range ,
+                   "using labels and using the" cmd "range" ,
+                   "on the lines themselves. Choose one" ,
+                   "or the other and retry."
+          Address ISPExec "Setmsg msg(isrz002)"
+          call clean_up 8
+          end
+       "(start) = linenum .zfrange"
+       "(stop) = linenum .zlrange"
+       start = start + 0
+       stop  = stop  + 0
+       if start + stop = 0 then do
+          zerrsm = "Error"
+          zerrlm = "SPELLC is confused with the" ,
+                   "ranges that you've asked it to check." ,
+                   "Please insure you have only a single range" ,
+                   "deifned and try again."
+          Address ISPExec "Setmsg msg(isrz002)"
+          call clean_up 8
+          end
+       end
+    end
+
+/* ---------------------------------------------- *
+ * Define the location for the messages when done *
+ * ---------------------------------------------- */
+ finalpos = start
+
+/* -------------------------------------- *
+ * Reset the Edit display before we start *
+ * -------------------------------------- */
+ "Reset"
+
+/* -------------------------------------------- *
+ * Allocate and read in the dictionary of words *
+ * -------------------------------------------- */
+ dictdd = "dict"random(999)
+ Address TSO
+ "Alloc f("dictdd") ds("dictdsn") shr reuse"
+ "Execio * diskr" dictdd "(finis stem dict."
+ "Free  f("dictdd")"
+ Address ISREdit
+
+/* --------------------------------------- *
+ * Now process all words and:              *
+ *   1) make upper case                    *
+ *   2) place into a stem for quick access *
+ * --------------------------------------- */
+ do i = 1 to dict.0
+    if left(dict.i,1) = "*" then iterate
+    dict.i = translate(dict.i)
+    do iw = 1 to words(dict.i)
+       w = word(dict.i,iw)
+       word.w = w
+       public = public + 1
+       end
+    end
+    public = addcomma(public)
+    drop dict.i
+
+/* ----------------------------- *
+ * Now ask for a user dictionary *
+ * ----------------------------- */
+ Address ISPExec
+ "Addpop"
+ do forever
+    "Display Panel(Spellcd)"
+    if rc > 0 then do
+         zerrsm = "Cancelled"
+         zerrlm = "Spell Checking cancelled by user",
+                  "request (PF3)."
+         "SetMsg Msg(isrz002)"
+         call clean_up 8
+         end
+    if usrdict = null then leave
+    if sysdsn(usrdict) = "OK"
+    then leave
+    else do
+         zerrsm = "Error"
+         zerrlm = "Invalid data set name specified",
+                  "correct and press enter or",
+                  "blank out and press enter to",
+                  "continue."
+         "SetMsg Msg(isrz002)"
+         end
+    end
+ "Rempop"
+ Address ISREdit
+
+/* ------------------------------- *
+ * Initialization for Elapsed Time *
+ * ------------------------------- */
+ ss = Time('E')
+
+/* -------------------------------------- *
+ * Process the User Dictionary if present *
+ * -------------------------------------- */
+ if usrdict <> null then do
+    Address ISPExec,
+      "Vput (usrdict) Profile"
+    Address TSO
+    "Alloc f("dictdd") ds("usrdict") shr reuse"
+    "Execio * diskr" dictdd "(finis stem dict."
+    "Free  f("dictdd")"
+    do i = 1 to dict.0
+       if left(dict.i,1) = "*" then iterate
+       if strip(nls_alpha""nls_alpha_low) /= null ,
+       then dict.i = translate(dict.i,nls_alpha,nls_alpha_low)
+       else dict.i = translate(dict.i)
+       do iw = 1 to words(dict.i)
+          w = word(dict.i,iw)
+          word.w = w
+          private = private + 1
+          end
+       end
+    drop dict.i
+    end
+
+/* --------------------------------- *
+ * Return to the ISREdit environment *
+ * and exclude (hide) all lines.     *
+ * --------------------------------- */
+ Address ISREdit
+ "Exclude all"
+
+/* ------------------------------ *
+ * Determine the display interval *
+ * ------------------------------ */
+ numlines = stop - start
+ select
+   when numlines < 100  then split = 10
+   when numlines < 1000 then split = 50
+   when numlines < 5000 then split = 100
+   otherwise                 split = 500
+ end
+
+ ShowFirst = 0
+/* --------------------------------- *
+ * Now process each line in the data *
+ * --------------------------------- */
+ do l = start to stop
+     "(line) = line" l
+     if rc > 0 then leave
+     line = translate(line," ",from)
+     shadow = line
+     nsf = 0
+     ss = Time('E')
+     do w = 1 to words(line)
+        word = word(line,w)
+        total = total + 1
+        inv = 0
+        if datatype(word) = "NUM" then iterate
+        Select
+           when spellpg = "No"
+              then call test_word
+           when l//split > 0 then
+                   call test_word
+           when l//split = 0 then do
+                Address ISPExec "Control Display Lock"
+                Address ISPExec "Addpop row(2) column(11)"
+                Call Elapsed_Time
+                Address ISPExec "Display Panel(spellcp)"
+                call test_word
+                Address ISPExec "Rempop"
+                end
+           Otherwise nop
+        end
+        if inv = 0 then
+           if length(word) > 0 then
+              shadow = overlay(' ',shadow,pos(word,shadow), ,
+                       length(word))
+        end
+     if nsf = 1 then do
+        if l = start then
+          ShowFirst = 1
+        do s = 1 to length(shadow)
+           if substr(shadow,s,1) <> "*" then
+              shadow = overlay(' ',shadow,s,1)
+           end
+        "line_after" l "= infoline '"shadow"'"
+        "Label" l "= .flip"
+        "flip .flip"
+        end
+     end
+
+/* ------------------------------------- *
+ * Completed spell checking - now report *
+ * ------------------------------------- */
+ do i = 1 to words(invalid)
+    invalid.i = word(invalid,i)
+    end
+ invalid.0 = words(invalid)
+
+/* ----------------------------------------------- *
+ * Now sort the misspelled words to report on them *
+ * ----------------------------------------------- */
+ call sort_stem
+
+ "Label" finalpos "= .fpos"
+ "locate" finalpos
+
+/* ------------------------------------------------------- *
+ * Generate the ISPF Infoline messages with information on *
+ * the results of the spelling verification                *
+ * ------------------------------------------------------- */
+ uplines = 0
+ if invalid.0 > 0 then do
+    if ShowFirst = 0 then
+      "flip .fpos"
+    "line_before" finalpos " = infoline '" || ,
+       invalid.0 "invalid words found in" ,
+       errors "locations'"
+    Call Elapsed_Time
+    "line_before" finalpos " = infoline '" || ,
+        "A total of" total "words were checked." ,
+        "Elapsed time:" et "'"
+    "line_before" finalpos " = infoline '" || ,
+        "The following are the invalid words.'"
+    uplines = uplines + 3
+    do i = 1 to invalid.0 by 6
+       i1=i+1;i2=i+2;i3=i+3
+       i4=i+4;i5=i+5
+       invalidw = invalid.i invalid.i1 invalid.i2 invalid.i3 ,
+                  invalid.i4 invalid.i5
+       "line_before" finalpos " = infoline " || ,
+        '">' invalidw  '"'
+       uplines = uplines + 1
+       end
+    end
+else do
+     "Flip .fpos"
+     "Flip"
+     Call Elapsed_Time
+    "line_after" finalpos - 1 " = infoline '" || ,
+       "All words were successfully validated." ,
+       "Elapsed time:" et "'"
+       uplines = uplines + 1
+     end
+ if finalpos = 1 then
+    uplines = uplines + 1
+ "up" uplines
+ if length(save_load) > 0 then call clean_up 0
+
+/* ------------------------------------------------------ *
+ * Below are the subroutines used to perform the spelling *
+ * verification.                                          *
+ * ------------------------------------------------------ */
+
+/* --------------------------------- *
+ * Now test the validity of the word *
+ * --------------------------------- */
+ Test_Word:
+
+/* ----------------------------- *
+ * Remove quotes around the word *
+ * ----------------------------- */
+ if left(word,1) = "'" then
+    parse value word with "'"word"'"
+
+/* ----------------------------- *
+ * Remove quotes around the word *
+ * ----------------------------- */
+ if left(word,1) = '"' then
+    parse value word with '"'word'"'
+
+/* --------------------------------- *
+ * Test for trailing chars to remove *
+ * --------------------------------- */
+ if pos(right(word,1),trail) > 0 then
+    word = left(word,length(word)-1)
+
+/* ----------------------------- *
+ * Remove trailing quotes if any *
+ * ----------------------------- */
+ if right(word,1) = "'" then
+    parse value word with word"'"
+ if right(word,1) = '"' then
+    parse value word with word'"'
+
+/* --------------------------------- *
+ * Test for trailing chars to remove *
+ * a second time.                    *
+ * --------------------------------- */
+ if pos(right(word,1),trail) > 0 then
+    word = left(word,length(word)-1)
+
+/* --------------------------------- *
+ * Test whether nls support          *
+ * is active and is to be used       *
+ * --------------------------------- */
+ if strip(nls_alpha""nls_alpha_low) /= null then ,
+   do
+     uword      = translate(word,nls_alpha,nls_alpha_low)
+     uother     = nls_other
+     ualpha     = nls_alpha
+     ualpha_low = nls_alpha_low
+   end
+ else do
+     uword      = translate(word)
+     uother     = other
+     ualpha     = alpha
+     ualpha_low = alpha_low
+   end
+
+/* ------------------------------------------ *
+ * Verify word starts with an alpha character *
+ * ------------------------------------------ */
+ if pos(left(word,1),ualpha""ualpha_low) = 0 then return
+
+/* ------------------------------------------------------- *
+ * Test for special chars in word and if there ignore word *
+ * ------------------------------------------------------- */
+ do o = 1 to length(uother)
+    if pos(substr(uother,o,1),uword) > 0 then return
+    end
+
+/* ----------------------------------------------------- *
+ * Test to see if the ignore all caps options is enabled *
+ * and if so test word for all caps.                     *
+ * ----------------------------------------------------- */
+ if chkcaps <> "No" then do
+    nword = strip(translate(word,' ',ualpha))
+    if length(nword) = 0 then return
+    end
+
+/* ----------------------------------------- *
+ * Now test if the word is in the dictionary *
+ * ----------------------------------------- */
+ if word.uword = uword then return
+
+/* --------------------------------- *
+ * Handle words separated by a slash *
+ * thx to Asher Aremband             *
+ * --------------------------------- */
+ if pos('/',uword) > 0 then
+   do
+     tword  = uword
+     do while tword <> null
+       parse var tword uwp1 '/' tword
+       if word.uwp1 = uwp1 then
+         ok = 1
+       else
+         do
+           ok = 0
+           leave
+         end
+     end
+     if tword = null & ok = 1 then return
+   end
+
+/* ----------------------- *
+ * Handle possessive words *
+ * ----------------------- */
+ if right(uword,2) = "'S" then do
+    tword = substr(uword,1,length(uword)-2)
+    if word.tword = tword then return
+    end
+
+/* --------------- *
+ * Handle 'd words *
+ * --------------- */
+ if right(uword,2) = "'D" then do
+    tword = substr(uword,1,length(uword)-2)
+    if word.tword = tword then return
+    end
+
+/* -------------- *
+ * Handle plurals *
+ * -------------- */
+ if right(uword,1) = "S" then do
+    tword = substr(uword,1,length(uword)-1)
+    if word.tword = tword then return
+    end
+
+/* -------------------------- *
+ * Word is unknown so flag it *
+ * -------------------------- */
+ loc = pos(word,shadow)
+ if loc > 0 then
+    ns = overlay("*",shadow,loc,length(word),"*")
+ shadow = ns
+ nsf = 1
+ inv = 1
+ errors = errors + 1
+ if wordpos(uword,invalid) = 0
+    then invalid = strip(invalid uword)
+ invalidw = words(invalid)
+ return
+
+/* ----------------------------------------
+   Simple bubble sort of "stem' by invalid.1
+   modelled on code from
+   Ken Singer, Shell Oil, Houston
+   ---------------------------------------- */
+   sort_stem: procedure expose invalid.
+
+   if invalid.0 = 1 then return /* simple sort !*/
+   ctr =  invalid.0
+   do y = 1 to  ctr - 1
+      do x = y+1 to ctr
+         if invalid.x < invalid.y then do
+             /* swap these 2 entries */
+             t1 = invalid.y ;
+             invalid.y = invalid.x
+             invalid.x = t1
+         end
+      end x
+   end y
+   return
+
+/* --------------------------------------- *
+ * Elapsed time routine from John Kalinich *
+ * --------------------------------------- */
+ Elapsed_Time:
+ ss = Time('E')
+ parse value ss with x"."sec
+ sf = Bitor(Format(Trunc(ss//60),2),'F0'x)
+ mm = Format(Trunc(ss/60),2)
+ mf = Bitor(Format(Trunc(mm//60),2),'F0'x)
+ hh = Bitor(Format(Trunc(mm/60),2),'F0'x)
+ et = hh||":"||mf||":"sf"."left(sec,2)
+ Return
+
+/* -------------------------------------------- *
+ * extended parsing of defaults set in SPELLCDF *
+ * thanks to Hartmut Beckmann                   *
+ * -------------------------------------------- */
+ parse_defaults:
+
+ var.   = null
+ email = null
+ parse value spellc_defaults ,
+                   with var.1 "##" var.2 "##" var.3 "##" ,
+                        var.4 "##" var.5 "##" var.6 "##" .
+ var.0 = 6
+ DO i = 1 to var.0
+       parse value var.i with var.i.1 ":" .
+       var.i.1 = TRANSLATE(STRIP(var.i.1))
+       IF var.i.1 = null THEN ITERATE
+       SELECT
+         WHEN ( var.i.1 = "DEF") ,
+           THEN DO
+                   parse value var.i with . ":" ,
+                               dictdsn   "/" email "/" ,
+                               usrmodel "/" panelloc .
+                   dictdsn  = STRIP(dictdsn)
+                   email    = STRIP(email)
+                   usrmodel = STRIP(usrmodel)
+                   panelloc = STRIP(panelloc)
+                END
+         WHEN ( var.i.1 = "BASE") ,
+           THEN DO
+                   parse value var.i with . ":" ,
+                                    alpha "/" alpha_low "/" ,
+                                    from "/" other "/" .
+                       alpha     = STRIP(alpha)
+                       from      = STRIP(from)'/'
+                       other     = STRIP(other)
+                END
+         WHEN ( var.i.1 = "NLS") ,
+           THEN DO
+                   parse value var.i with . ":" ,
+                                nls_alpha "/" nls_alpha_low "/",
+                                nls_from "/"  nls_other "/" .
+                   nls_alpha     = STRIP(nls_alpha)
+                   nls_alpha_low = STRIP(nls_alpha_low)
+                   nls_from      = STRIP(nls_from)
+                   nls_other     = STRIP(nls_other)
+                END
+         OTHERWISE ,
+                DO
+                   IF email /= null THEN ITERATE
+                   parse value var.i with dictdsn ,
+                                "/" email "/" usrmodel ,
+                                "/" panelloc .
+                   dictdsn  = STRIP(dictdsn)
+                   email    = STRIP(email)
+                   usrmodel = STRIP(usrmodel)
+                   panelloc = STRIP(panelloc)
+                END
+       END
+ END
+ var.   = null
+ return
+
+/* ----------------------- *
+ * Get the SPELLC Defaults *
+ * ----------------------- */
+ SpellChk_Defaults:
+   spellc_defaults = spellcdf()
+   email = null
+   return
+
+/* ------------------------ *
+ * Clean up any allocations *
+ * ------------------------ */
+ Clean_Up:
+ arg rc
+ if rc = null then rc = 0
+ if length(save_load) = 0 then exit rc
+ Address ISPExec
+ do until length(save_load) = 0
+    parse value save_load with dd libd save_load
+    if left(libd,6) = "ALTLIB" then do
+       if libd = "ALTLIBC" then lib = "CLIST"
+                           else lib = "EXEC"
+       Address TSO,
+         "Altlib Deact Application("lib")"
+       end
+    else do
+         "libdef" libd
+         end
+    address tso,
+       "free f("dd")"
+    end
+ Exit rc
+
+/**************************************************************
+* Trap uninitialized variables                                *
+***************************************************************/
+Sub_Novalue:
+Say "Variable" ,
+   condition("Description") "undefined in line" sigl":"
+Say sourceline(sigl)
+if sysvar("sysenv") <> "FORE" then exit 8
+say "Report the error in this application along with the",
+    "syntax used."
+exit 8
+
+  /* ----------------- REXX ------------------------- *
+  | Take a number and display it with comma's in it. |
+  |                                                  |
+  | e.g.  1000 becomes 1,000                         |
+  |                                                  |
+  | usage:   comma_num = addcomma(number)            |
+  |                                                  |
+  | supports numbers up to 34 digits long            |
+  |                                                  |
+  | Copied from Doug Nadel                           |
+  * ------------------------------------------------ */
+AddComma:
+  arg bignum
+  cbignum = strip(translate('0,123,456,789,abc,def,ghi,jkl,mno,pqr,stu,vwx', ,
+    right(bignum,34,','), ,
+    '0123456789abcdefghijklmnopqrstuvwx'),'L',',')
+  return cbignum
+
+AddComma: Procedure
+  arg bytes
+/* ----------------------------------------------------- */
+/* number format code thanks to Doug Nadel               */
+/* ----------------------------------------------------- */
+  str=strip(translate('0,123,456,789,abc,def', ,
+    right(bytes,16,','), ,
+    '0123456789abcdef'),'L',',')
+  bytes = strip(str)

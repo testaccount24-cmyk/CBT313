@@ -1,0 +1,37 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+%
+`      The following commands may be entered on the ISPF Command line when
+`      in the TSO Mail Table display.  Information on them will be presented
+`      in sequence or selected by number.
+
+¦      Action Command Options:
+
+¦      0 -¬Defaults          `Establish TSO Mail Processing Defaults
+¦      1 -¬Find              `Find a character string in any row in the table
+¦      2 -¬Refresh           `Process new mail and redisplay the mail table
+¦      3 -¬Sendmail          `Send a note to another user
+¦      4 -¬Sort              `Sort the table by the specified field name
+¦      5 -¬Safemail          `Registration for SAFE Mail Processing
+¦      6 -¬Logging           `Log the message into a log of related messages
+
+¦      Display Command Options:
+
+¦         ¬Long              `Use the default 2 line display for each message
+¦         ¬Short             `Use a short 1 line display for each message
+¦         ¬XLong             `Use a extra long 3 line display for each message
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 0,tmailh10  1,tmailh1a  2,tmailh1b  3,tmailh1c
+                      4,tmailh1d  5,tmailh1e  6,tmailh1f *,?)
+)End

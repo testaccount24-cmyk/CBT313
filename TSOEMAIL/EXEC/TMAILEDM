@@ -1,0 +1,76 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TmailEDM                                           *
+         *                                                               *
+         * Function:  Establish the ISPF Edit environment to be used     *
+         *            when creating or forwarding a TSO/E-Mail message   *
+         *                                                               *
+         *            Internally called by TMAILSND via IMACRO           *
+         *                                                               *
+         * Syntax:    %Tmailedm                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * History:                                                      *
+         *            10/19/93 - bug fix for fwd flag                    *
+         *            10/08/93 - update to put cursor on command line    *
+         *            09/27/93 - fix for bounds for lrecl>80             *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        Address ISREDIT
+
+        "MACRO"
+
+        exit_rc = ""
+
+        "PROFILE UNLOCK"
+        "RECOVERY OFF"
+        "NUMBER OFF"
+        "CAPS OFF"
+        "NULL ON"
+        "AUTOLIST OFF"
+        "PACK OFF"
+        "HEX OFF"
+        "AUTOSAVE ON"
+        "(lrecl) = LRECL"
+        if lrecl <> 80 then rbound = lrecl
+                       else rbound = 72
+        "BOUNDS = 1" rbound
+        "RESET"
+        Address ISPEXEC "VGET (FWD)"
+        "(BOT) = LINENUM .ZLAST"
+        if rc > 0 then do
+           bot = 0
+           fwd = ""
+           end
+        "DEFINE TMFIXSUB MACRO CMD"
+        "DEFINE FIXSUB ALIAS TMFIXSUB"
+        "DEFINE TMIBMFAX MACRO CMD"
+        "DEFINE FAXIBM ALIAS TMIBMFAX"
+        "DEFINE TMAILEME MACRO CMD"
+        "DEFINE TMAILEMC MACRO CMD"
+        "DEFINE END ALIAS TMAILEME"
+        "DEFINE CANCEL ALIAS TMAILEMC"
+        if fwd = "YES" then do
+                            "BOUNDS = 1" lrecl
+                            "RESET"
+                            do i = 1 to bot
+                                   "SHIFT )" i "2"
+                               end
+                               "CHANGE ' ' '>' 1 ALL"
+                            "BOUNDS = 1" rbound
+                            "LINE_AFTER 0 = ",
+      "'>----------------- Forwarding the following message -----------------<'"
+                            "LINE_AFTER .ZLAST = ",
+      "'>------------------ End of the forwarded message -------------------<'"
+                            exit_rc = 1
+                            end
+                            "RESET"
+      if bot = 0 then
+           "TENTER .ZF"
+      if exit_rc = 1 then exit 1

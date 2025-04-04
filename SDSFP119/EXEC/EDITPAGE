@@ -1,0 +1,22 @@
+        /* --------------------  rexx procedure  -------------------- *
+         * Name:      EditPage                                        *
+         *                                                            *
+         * Function:  Invoke the SDSFPAGE command                     *
+         *                                                            *
+         * Syntax:    %Editpage options                               *
+         *                                                            *
+         *            see SDSFPAGE for options                        *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *            Kaiser Permanente Information Technology        *
+         *            Walnut Creek, CA 94598                          *
+         *            (925) 926-5332                                  *
+         *            Internet: lionel.b.dyck@kp.org                  *
+         *                                                            *
+         * History:                                                   *
+         *            09/04/01 - created                              *
+         *                                                            *
+         * ---------------------------------------------------------- */
+         Address ISREdit
+         "Macro (parm)"
+         "%sdsfpage" parm "/EDIT"

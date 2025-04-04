@@ -1,0 +1,225 @@
+        /* --------------------  rexx procedure  -------------------- *
+         * Name:      SPELLCDF                                        *
+         *                                                            *
+         * Function:  Defaults for the SPELLC command                 *
+         *                                                            *
+         * Syntax:    x=spellcdf()                                    *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *                                                            *
+         * History:                                                   *
+         *            04/06/16 - Updated for new dictionary dsn       *
+         *            06/17/04 - Change comments for panelloc         *
+         *            06/04/04 - Add panelloc variable                *
+         *            05/28/04 - Add & to from list                   *
+         *            05/21/04 - Add % to from list                   *
+         *            05/19/04 - Improve comments on dictionary dsn   *
+         *            05/07/04 - Add vertical bar to from list        *
+         *            05/06/04 - revised nls support                  *
+         *                     - new parameter nls(aaa) to support    *
+         *                       other languages dynamically          *
+         *                       >>> waiting for input                *
+         *            05/05/04 - updated by hartmut beckmann for nls  *
+         *            05/03/04 - move from and other here from spellc *
+         *                     - add model for personal dictionary ds *
+         *            04/29/04 - creation                             *
+         *                                                            *
+         * ---------------------------------------------------------- */
+
+         signal on novalue name sub_novalue
+         call sub_init
+         parse UPPER arg parms
+         call sub_parse_parms
+         IF debug = "ON" then _x_ = TRACE("R")
+
+        /* ----------------------------------- *
+         * Define the Dictionary Data Set Name *
+         * ----------------------------------- */
+         dictdsn = "'lbdyck.spellc.words'"
+
+        /* ---------------------------------------------------------- *
+         * Define the e-mail address for users to send updated words  *
+         * for the common dictionary to. This should be your address  *
+         * and not the author of this program. You can then send your *
+         * updated list of words to the author.                       *
+         * ---------------------------------------------------------- */
+         email = "lbdyck@gmail.com"
+
+        /* --------------------------------- *
+         * Define the alphabet in upper case *
+         * --------------------------------- */
+         alpha      = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+         a_low      = "abcdefghijklmnopqrstuvwxyz"
+
+        /* -------------------------------------------------------- *
+         * Define characters to translate to blanks before checking *
+         * -------------------------------------------------------- */
+                /* --------------------------------------------- *
+                 * description of codepoints (nls codepages)     *
+                 *   x'5A' exclamation mark                      *
+                 *   x'4F' vertical line                         *
+                 *   x'AD' latin capital letter y with acute     *
+                 * --------------------------------------------- */
+         from       = ":,?()*=;&%<>¨+$"X2C("5A4FAD")
+
+        /* ------------------------------------------- *
+         * Define characters not allowed within a word *
+         * and if found will cause the word to be      *
+         * assumed good.                               *
+         * ------------------------------------------- */
+         other      = "0123456789_-@."
+
+        /* ---------------------------------------------------------- *
+         * Define a model data set name for the personal dictionary   *
+         * so that if the user does not have one and uses the SPELLCA *
+         * command to add a word to it they will get one.             *
+         * ---------------------------------------------------------- */
+         if sysvar("sysuid") <> sysvar("syspref")
+            then pref = sysvar("syspref")"."sysvar("sysuid")
+            else pref = sysvar("sysuid")
+         usrmodel = "'"pref".user.dict'"
+
+        /* --------------------------------------------------------- *
+         * PanelLoc defines the location of the ISPF Panels.         *
+         *   null - use the inline ispf panels in the spellcpn exec  *
+         *   non-null - use the ispf panels from the ispplib library *
+         * --------------------------------------------------------- */
+         panelloc = null
+         /* panelloc = 1 */
+
+        /* -------------------------------------------- *
+         * Define NLS support                           *
+         * -------------------------------------------- */
+         nls_supported = "GER"    /* blank or valid lang value */
+         nls_supported = ""       /* blank or valid lang value */
+         _x_ = func_nls_support(nls_parm)
+
+        /* -------------------------------------------- *
+         * Now return our local customization variables *
+         * -------------------------------------------- */
+         ret_defaults = dictdsn "/" email "/" usrmodel ,
+                        "/" panelloc
+         ret_base     = ,
+                " ##BASE:"    alpha "/" a_low "/" from "/" other
+         ret_specials = ,
+                " ##NLS:" nls_alpha "/" nls_alpha_low "/" ,
+                          nls_from "/" nls_other "/" nls_dict
+         IF calltype = "COMMAND" then call sub_info_messages
+         ELSE DO
+                   return ret_defaults ,
+                          ret_base     ,
+                          ret_specials
+              END
+         Exit
+
+        /* -------------------------------------------- *
+         * initialize variables                         *
+         * -------------------------------------------- */
+         sub_init:
+         parse source . calltype myname .
+         parse value "" with null invalid invalid.
+         nls_alpha     = null
+         nls_alpha_low = null
+         nls_other     = null
+         nls_from      = null
+         nls_dict      = null
+         nls_supported = null
+        return
+
+        /* ----------------------------------- *
+         * parse input parms                   *
+         * ----------------------------------- */
+         sub_parse_parms:
+         parse var parms arg_parms "/" run_parms
+         parse var run_parms ,
+                       1 "DEBUG(" debug ")"
+         parse VAR arg_parms ,
+                       1 "NLS(" nls_parm ")" .
+         nls_parm = STRIP(nls_parm)
+         return
+
+        /* -------------------------------------------- *
+         * output of info messages                      *
+         * -------------------------------------------- */
+         sub_info_messages:
+                   SAY ""myname"-Infos:"
+                   SAY "defaults:"
+                   SAY ret_defaults
+                   SAY ""
+                   SAY "base:"
+                   SAY ret_base
+                   SAY ""
+                   SAY "specials:"
+                   SAY ret_specials
+                   return
+
+        /* -------------------------------------------- *
+         * NLS support                                  *
+         * -------------------------------------------- */
+         func_nls_support:
+         if nls_supported = null then return 0
+         parse upper arg f_nls_parm .
+         if f_nls_parm    = null then f_nls_parm = nls_supported
+         SELECT
+          WHEN ( f_nls_parm = "GER") THEN ,
+            DO
+                /* --------------------------------------------- *
+                 * nls support - german                          *
+                 * codepage IBM1141  GERMAN/AUSTRIA with EURO    *
+                 *   x'4A' latin capital letter A with diaeresis *
+                 *   x'E0' latin capital letter O with diaeresis *
+                 *   x'5A' latin capital letter U with diaeresis *
+                 *   x'C0' latin small   letter A with diaeresis *
+                 *   x'6A' latin small   letter O with diaeresis *
+                 *   x'D0' latin small   letter U with diaeresis *
+                 *   x'A1' latin small   letter sharp s (keep it *
+                 *    because no capital letter sharp s exists)  *
+                 *   x'4F' exclamation mark                      *
+                 *   x'BB' vertical line                         *
+                 * --------------------------------------------- */
+                 nls_alpha     = alpha""X2C("4AE05AA1")
+                 nls_alpha_low = a_low""X2C("C06AD0A1")
+                 nls_dict      = null
+                 nls_other     = other
+                 nls_from      = ""X2C("4FBB")
+            END
+          WHEN ( f_nls_parm = "?SPA") THEN ,
+            DO
+                /* --------------------------------------------- *
+                 * nls support - spanish                         *
+                 * codepage ???????                              *
+                 *   x'??' description                           *
+                 * --------------------------------------------- */
+            END
+          OTHERWISE ,
+            DO
+                 SAY ""myname"-ERROR: unsupported nls code: "f_nls_parm
+                 SAY ""
+                 return 8
+            END
+         END
+
+        /* ------------------------------------------- *
+         * remove NLS chars dynamically                *
+         * ------------------------------------------- */
+         DO i = 1 to LENGTH(from)
+            fromchar = SUBSTR(from,i,1)
+            if pos(fromchar,nls_alpha""nls_alpha_low) > 0 ,
+            then iterate
+            else nls_from = nls_from""fromchar
+         END
+         if nls_other = null then,
+            nls_other = other
+        return 0
+
+        /************************************************************
+        * Trap uninitialized variables                              *
+        *************************************************************/
+        sub_novalue:
+        Say "Variable" ,
+           condition("Description") "undefined in line" sigl":"
+        Say sourceline(sigl)
+        if sysvar("sysenv") <> "FORE" then exit 8
+        say "Report the error in this application along with the",
+            "syntax used."
+        exit 8

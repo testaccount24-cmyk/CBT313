@@ -1,0 +1,141 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      softpcdr                                           *
+         *                                                               *
+         * Function:  Process softcopy publications loaded by SCRT       *
+         *            1. process bkshelf                                 *
+         *               - change bkmdsn from hlq.scrt.* to hlq.*        *
+         *               - rename hlq.scrt.* dataset to hlq.* dataset    *
+         *               - update bkshelf                                *
+         *            2. rename hlq.scrt.*.bkshelf to hlq.*.bkshelf      *
+         *               - add bkshelf/title to newshelf                 *
+         *                                                               *
+         * Syntax:    %softpcdr                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *            IBMLINK:  SYSLBD                                   *
+         *                                                               *
+         * History:                                                      *
+         *            05/13/98 - add some metrics                        *
+         *            05/12/98 - clean up and intergrate into softpuba   *
+         *            04/27/98 - creation                                *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+         parse value "" with null newshelf. dsn title
+         newshelf.0 = 0
+         delbook    = 0
+         delindex   = 0
+         delshelf   = 0
+         new_books  = 0
+         new_indexs = 0
+
+         inhlq      = "MVS.SCRT"
+         inhlq_l    = length(inhlq)+1
+         lmdid      = inhlq".**"
+         ddn        = SCRT""random(99)
+
+         x=msg("Off")
+
+         /* get defaults */
+         "%softpdft"
+         Address ISPExec
+         "Vget (build index) Shared"
+         outhlq = index
+         build_table = strip(build,,"'")
+
+         "LmDinit listid(lmdid) Level("lmdid")"
+         do forever
+              "Lmdlist Listid("lmdid") Dataset(dsn) Option(LIST)"
+              if rc > 0 then do
+                "LmDfree listid("lmdid")"
+                call do_newshelf
+                Exit
+                end
+            select
+               when right(dsn,8) = ".BKSHELF" then call do_shelf
+               when right(dsn,8) = ".BKINDEX" then call do_rename
+               when right(dsn,5) = ".BOOK"    then call do_rename
+               otherwise say "bad dsn:" dsn
+               end
+          end
+
+          do_shelf:
+          Address TSO
+          new_dsn = outhlq""substr(dsn,inhlq_l)
+          if sysdsn("'"new_dsn"'") = "OK"
+          then do
+             "Delete '"dsn"'"
+             delshelf = delshelf + 1
+             end
+          else call fix_bkshelf
+          Address ISPExec
+          return
+
+          do_rename:
+          Address TSO
+          new_dsn = outhlq""substr(dsn,inhlq_l)
+          sysvolume = null
+          Call listdsi "'"new_dsn"'" "NoRecall"
+          Select
+            When sysreason = 9 then call delete_it
+            When sysreason = 25 then call delete_it
+            When sysreason = 5 then do
+                 "Rename '"dsn"' '"new_dsn"'"
+                 if right(dsn,8) = ".BKINDEX" then
+                    new_indexs   = new_indexs + 1
+                 if right(dsn,5) = ".BOOK"    then
+                    new_books = new_books + 1
+                 end
+            Otherwise call delete_it
+             end
+          Address ISPExec
+          return
+
+          delete_it:
+            "Delete '"dsn"'"
+             if right(dsn,8) = ".BKINDEX" then
+                delindex = delindex + 1
+             if right(dsn,5) = ".BOOK"    then
+                delbook = delbook + 1
+          return
+
+          fix_bkshelf:
+          Address TSO,
+            "Rename '"dsn"' '"new_dsn"'"
+          Address ISPExec
+          "Vput (inhlq outhlq)"
+          "Edit dataset('"new_dsn"') Macro(softpcde)",
+             "Confirm(no)"
+          "Vget (Title) shared"
+          c          = newshelf.0 + 1
+          newshelf.c = "S" new_dsn title
+          newshelf.0 = c
+          say "Processed bookshelf:" newshelf.c
+          return
+
+          Do_NewShelf:
+          Address TSO
+          if newshelf.0 > 0 then do
+             say "New Book Shelves found.  Creating" build_table"(NEWSHELF)"
+             "delete '"build_table"(NEWSHEL3)'"
+             "Rename '"build_table"(NEWSHEL2)' '"build_table"(NEWSHEL3)'"
+             "Rename '"build_table"(NEWSHEL1)' '"build_table"(NEWSHEL2)'"
+             "Rename '"build_table"(NEWSHELF)' '"build_table"(NEWSHEL1)'"
+             "Alloc f("ddn") ds('"build_table"(NEWSHELF)') Shr Reuse"
+             "Execio * Diskw" ddn "(Finis Stem newshelf."
+             "Free  f("ddn")"
+             say "New Shelves:    " newshelf.0
+             say "New Books:      " new_books
+             say "New Indexes:    " new_indexs
+             say "Deleted books:  " delbook
+             say "Deleted indexes:" delindex
+             say "Deleted shelves:" delshelf
+          end
+          else say "No new Book Shelves found.",
+               build_table"(NEWSHELF) not updated."
+          return

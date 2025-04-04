@@ -1,0 +1,66 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ` type(text)   intens(low ) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+)BODY
++------------------------% TSO/E-Mail Send Processing +-------------------------
+%Command ===>_zcmd
++
+`Send a Message or Data Set to a TSO or VM user
++
+`To:       Nickname %===>_Z
+          `(Nickname or Distribution List)%*+
++
+`or        Center   %===>_Z       `(NJE Node Name)
+`          Userid   %===>_Z       `(Userid)
++
+`Optional: Data Set Name %===>_Z
+`             Sequential %===>_Z`     Specify%Y`if the above data set is a PDS
+`                                     member and you want it sent sequentially
+`      Send as a Message %===>_Z`     Yes or No to send the file as a Message
++
+`Press ENTER for ISPF Edit to create your message.
++
++
+%*`Notes:See TSO HELP on NICKNAMES. Requires 'userid.NAMES.TEXT' file.
+)INIT
+  .ZVARS = '(SENDNAME SENDNODE SENDUID SENDDSN SENDSEQ SENDMSG)'
+  .CURSOR = SENDNAME
+  IF (&SENDNODE = &Z) &SENDNODE = &SENDCTR
+  &SENDSEQ = trans(&SENDSEQ &Z,'N' *,*)
+  &SENDMSG = trans(&SENDMSG &Z,'N' *,*)
+  &FILE    = &Z
+  &SQ      = &Z
+)PROC
+  IF (&SENDSEQ = Y)
+     &SQ = SEQ
+  IF (&SENDSEQ = N)
+     &SQ = &Z
+  IF (&SENDDSN NE &Z)
+     IF (&SENDMSG = Y)
+         &FILE = 'MSG(&SENDDSN)'
+     IF (&SENDMSG NE Y)
+         &FILE = 'DS(&SENDDSN)'
+  IF (&SENDDSN = &Z)
+     &SQ = &Z
+  IF (&SENDNAME  = &Z)
+    VER (&SENDUID,NONBLANK)
+    VER (&SENDNODE,NB,NAME)
+    &ZSEL = 'CMD(%TMAILSND &SENDNODE..&SENDUID &FILE &SQ )'
+  IF (&SENDNAME NE &Z)
+    IF (&SENDUID  NE &Z)  &SENDERR = YES
+         IF (&SENDNODE NE &Z)  &SENDERR = YES
+    IF (&SENDERR = YES)
+     &SENDERR = &Z
+     &mailsmsg = 'Send to who? '
+     &maillmsg= 'Can''t specify both Nickname &SENDNAME and &SENDNODE..&SENDUID'
+      .MSG = MAIL000
+    VER (&SENDNAME,NONBLANK)
+    &ZSEL = 'CMD(%TMAILSND &SENDNAME &FILE &SQ )'
+)END

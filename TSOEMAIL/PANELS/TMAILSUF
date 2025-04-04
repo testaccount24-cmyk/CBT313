@@ -1,0 +1,40 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ~ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) COLOR(yellow) hilite(uscore)
+   ` TYPE(INPUT) CAPS(off) INTENS(HIGH) COLOR(yellow) just(asis)
+)Body
++-------------------------% TSO/E-Mail Message Info +---------------------------
+%Command ===>_zcmd
+%
+¬     Define a Reply-To:`REPLYTO
+%     (optional if different from current TSO address - internet only)
+%
+¬     Verify your TSO/E-Mail Message Epilog:
++
++
+===>`EPILOG1                                                               +<===
+===>`EPILOG2                                                               +<===
+===>`EPILOG3                                                               +<===
+===>`EPILOG4                                                               +<===
+===>`EPILOG5                                                               +<===
+===>`EPILOG6                                                               +<===
+===>`EPILOG7                                                               +<===
+===>`EPILOG8                                                               +<===
+===>`EPILOG9                                                               +<===
+===>`EPILOG10                                                              +<===
++
+¬ The above text will be inserted at the end of each TSO/E-Mail message that
+¬ you send.
+¬
+)Init
+  .HELP = TMAILHS1
+)Proc
+    VPUT (replyto) profile
+    VPUT (EPILOG1 EPILOG2 EPILOG3 EPILOG4 EPILOG5) PROFILE
+    VPUT (EPILOG6 EPILOG7 EPILOG8 EPILOG9 EPILOG10) PROFILE
+)End

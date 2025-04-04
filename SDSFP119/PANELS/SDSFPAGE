@@ -1,0 +1,24 @@
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on) just(left )
+   ` type( input) intens(high) caps(off) just(left )
+   % type(text) intens(high)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+)Body Expand(\\)
+%-\-\- $cmd ~Page Menu &ver %-\-\-
++Command Input%===>_zcmd
++
++Select Page Print Option:
++
+   % 1+- Browse the Data Set
+   % 2+- Print to Sysout
+   % 3+- Print to Data Set
+   % 4+- E-Mail Data Set
+   % 5+- Edit Data Set
+
+)Init
+ .cursor = zcmd
+)Proc
+ Ver(&zcmd,range,1,5)
+)end

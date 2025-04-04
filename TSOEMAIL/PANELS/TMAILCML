@@ -1,0 +1,37 @@
+)Attr
+   @ type( input) intens(high) caps(off) just(left ) color(white)
+   ¬ type(text) intens(low ) caps(off) just(asis ) color(white)
+         hilite(uscore)
+   ! type(output) intens(low ) caps(off) just(asis ) color(yellow)
+   # type(text) intens(high) caps(on) just(asis ) color(yellow)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(white)
+         hilite(uscore)
+)Body
++------------------------% TSO/E-Mail Change Display +--------------------------
+%Command ===>_zcmd
+%
+%
+`  Mail from:!fid
+         `on:!maildatd !mailtime
+%
+`  Mail subject:
+%
+#==>@mailsubj
+%
+#==>@mailactn   +
+%
+`   Change the subject and status if you wish, then press 'ENTER" to
+`   continue or press 'PF3' to cancel the update.
+%
+%
+%
+)Init
+  &zcmd = &z
+  .cursor = mailsubj
+ if (&mailfloc NE &z)
+   &fid  = '&mailfid at &mailfloc'
+ if (&mailfloc = &z)
+    &fid  = &mailfid
+)Proc
+)End

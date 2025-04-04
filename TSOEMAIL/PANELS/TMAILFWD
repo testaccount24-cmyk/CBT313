@@ -1,0 +1,55 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ¦ type(output) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+)Body
++----------------------% TSO/E-Mail Forward Processing +------------------------
+%Command ===>_zcmd
+%
+%
+`      Enter the Node and Userid of the person to receive the forwarded
+`      TSO Mail item or%*`to send the mail back to the originator with
+`      a response.
++
+ `    Userid or Nickname to receive the mail or %*`
+%     Userid%===>_FWDUSER
+%   Nodename%===>_FWDNODE `    NJE Location for userid
+
+`   Use forwarded flag in text%===>_FWD  ` Yes, No or Never
+`       (text is shifted right 2 columns and a '>' is placed in column 1)
+`       (Yes - set flag, No - do not set flag this time, Never - never set flag)
+`
+`      Original Sender:
+#               Userid:!mailfid
+#               Node:  !mailfloc
+
+`     Original Subject:
+`              !mailsubj
+)Init
+ .cursor = FWDUSER
+ .help   = TMAILHFW
+ if (&fwd NE NEVER)
+     &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,YES &Z,YES *,*)
+)Reinit
+ if (&fwd NE NEVER)
+     &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,NO &Z,YES *,*)
+)Proc
+ IF (&FWDUSER = '*')
+     &FWDUSER = &MAILFID
+     &FWDNODE = &MAILFLOC
+ VER (&FWDUSER,NB)
+ VER (&FWDNODE,NAME)
+ IF (&FWDNODE NE &Z)
+    &FWDID = '&FWDNODE..&FWDUSER'
+ IF (&FWDNODE = &Z)
+    &FWDID = &FWDUSER
+ if (&fwd NE NEVER)
+    &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,NO *,*)
+ Ver (&FWD,NB,List,YES,NO,NEVER)
+ VPUT (FWD) PROFILE
+)End

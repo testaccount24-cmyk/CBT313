@@ -1,0 +1,474 @@
+/* --------------------  rexx procedure  -------------------- *
+ * Name:      spellcpn                                        *
+ *                                                            *
+ * Function:  called by spellc to allocate and load the       *
+ *            ispf panels if the dynamic option is selected   *
+ *                                                            *
+ * Syntax:    xx = spellcpn()                                 *
+ *                                                            *
+ * Returns:   return is the info to do the free libdef        *
+ *                                                            *
+ * Author:    Lionel B. Dyck                                  *
+ *                                                            *
+ * History:                                                   *
+ *            05/12/17 - Add missing otherwise to select      *
+ *            06/17/04 - created                              *
+ *                                                            *
+ * ---------------------------------------------------------- */
+
+ loadinfo = loadispf()
+ return loadinfo
+
+/* --------------------  rexx procedure  -------------------- *
+ * Name:      LoadISPF                                        *
+ *                                                            *
+ * Function:  Load ISPF elements that are inline in the       *
+ *            REXX source code.                               *
+ *                                                            *
+ * Syntax:    rc = loadispf()                                 *
+ *         or call loadispf                                   *
+ *                                                            *
+ *            The inline ISPF resources are limited to        *
+ *            ISPF Messages, Panels, and Skeletons,           *
+ *                 CLISTs and EXECs are also supported.       *
+ *            The inline resources must start in column 1     *
+ *            and use the following syntax:                   *
+ *            >START  - used to indicate the start of the     *
+ *                      inline data                           *
+ *            >END    - used to indicate the end of the       *
+ *                      inline data                           *
+ *            Each resource begins with a type record:        *
+ *            >type name                                      *
+ *               where type is CLIST, EXEC, MSG, PANEL, SKEL  *
+ *                     name is the name of the element        *
+ *                                                            *
+ * Sample usage:                                              *
+ *          -* rexx *-                                        *
+ *          load_info = loadispf()                            *
+ *          ... magic code happens here (your code) ...       *
+ *          Address ISPEXEC                                   *
+ *          do until length(load_info) = 0                    *
+ *             parse value load_info with dd libd load_info   *
+ *             if left(libd,6) = "ALTLIB" then do             *
+ *                if libd = "ALTLIBC" then lib = "CLIST"      *
+ *                                    else lib = "EXEC"       *
+ *                Address TSO,                                *
+ *                  "Altlib Deact Application("lib")"         *
+ *                end                                         *
+ *             else "libdef" libd                             *
+ *             address tso "free f("dd")"                     *
+ *             end                                            *
+ *          exit                                              *
+ *          >Start inline elements                            *
+ *          >Panel panel1                                     *
+ *          ...                                               *
+ *          >Msg msg1                                         *
+ *          ...                                               *
+ *          >End of inline elements                           *
+ *                                                            *
+ * Returns:   the list of ddnames allocated for use along     *
+ *            with the libdef's performed or altlib           *
+ *                                                            *
+ *            format is ddname libdef ddname libdef ...       *
+ *                   libdef may be altlibc or altlibe         *
+ *                   for altlib clist or altlib exec          *
+ *                                                            *
+ * Notes:     Entire routine must be included with REXX       *
+ *            exec - inline with the code.                    *
+ *                                                            *
+ * Comments:  The entire rexx program is processed from the   *
+ *            first record to the >END statement or the end   *
+ *            of the program, which ever comes first. There   *
+ *            are techniques to identify the start of the     *
+ *            inline code quicker but that technique would    *
+ *            require more coding on the part of the user of  *
+ *            this code. Ease compared to speed was chosen.   *
+ *                                                            *
+ *            Inline ISPTLIB or ISPLLIB were not supported    *
+ *            because the values for these would have to be   *
+ *            in hex.                                         *
+ *                                                            *
+ * Author:    Lionel B. Dyck                                  *
+ *            Kaiser Permanente Information Technology        *
+ *            Walnut Creek, CA 94598                          *
+ *            (925) 926-5332                                  *
+ *            Internet: lionel.b.dyck@kp.org                  *
+ *                                                            *
+ * History:                                                   *
+ *            08/05/02 - Creation                             *
+ *                                                            *
+ * ---------------------------------------------------------- *
+ * Disclaimer: There is no warranty, either explicit or       *
+ * implied with this code. Use it at your own risk as there   *
+ * is no recourse from either the author or his employeer.    *
+ * ---------------------------------------------------------- */
+ LoadISPF: Procedure
+
+ parse value "" with null kmsg kpanel kskel first returns ,
+                     kclist kexec
+/* ------------------------------------------------------- *
+ * Find the InLine ISPF Elements and load them into a stem *
+ * variable.                                               *
+ *                                                         *
+ * Elements keyword syntax:                                *
+ * >START - start of inline data                           *
+ * >CLIST name                                             *
+ * >EXEC name                                              *
+ * >MSG name                                               *
+ * >PANEL name                                             *
+ * >SKEL name                                              *
+ * >END   - end of all inline data (optional if last)      *
+ * ------------------------------------------------------- */
+ last_line = sourceline()
+ do i = last_line to 1 by -1
+    line = sourceline(i)
+    if translate(left(line,6)) = ">START " then leave
+    end
+ rec = 0
+/* --------------------------------------------------- *
+ * Flag types of ISPF resources by testing each record *
+ * then add each record to the data. stem variable.    *
+ * --------------------------------------------------- */
+ do j = i+1 to last_line
+    line = sourceline(j)
+    if translate(left(line,5)) = ">END "   then leave
+    if translate(left(line,7)) = ">CLIST " then kclist = 1
+    if translate(left(line,6)) = ">EXEC "  then kexec  = 1
+    if translate(left(line,5)) = ">MSG "   then kmsg   = 1
+    if translate(left(line,7)) = ">PANEL " then kpanel = 1
+    if translate(left(line,6)) = ">SKEL "  then kskel  = 1
+    rec  = rec + 1
+    data.rec = line
+    end
+
+/* ----------------------------------------------------- *
+ * Now create the Library and Load the Member(s)         *
+ * ----------------------------------------------------- */
+ Address ISPExec
+/* ----------------------------- *
+ * Assign dynamic random ddnames *
+ * ----------------------------- */
+ clistdd = "lc"random(999)
+ execdd  = "le"random(999)
+ msgdd   = "lm"random(999)
+ paneldd = "lp"random(999)
+ skeldd  = "ls"random(999)
+
+/* ---------------------------------------- *
+ *  LmInit and LmOpen each resource library *
+ * ---------------------------------------- */
+ if kclist <> null then do
+    call alloc_dd clistdd
+    "Lminit dataid(clist) ddname("msgdd")"
+    "LmOpen dataid("clist") Option(Output)"
+    returns = strip(returns clistdd "ALTLIBC")
+    end
+ if kexec <> null then do
+    call alloc_dd execdd
+    "Lminit dataid(exec) ddname("msgdd")"
+    "LmOpen dataid("exec") Option(Output)"
+    returns = strip(returns execdd "ALTLIBE")
+    end
+ if kmsg <> null then do
+    call alloc_dd msgdd
+    "Lminit dataid(msg) ddname("msgdd")"
+    "LmOpen dataid("msg") Option(Output)"
+    returns = strip(returns msgdd "ISPMLIB")
+    end
+ if kpanel <> null then do
+    call alloc_dd paneldd
+    "Lminit dataid(panel) ddname("paneldd")"
+    "LmOpen dataid("panel") Option(Output)"
+    returns = strip(returns paneldd "ISPPLIB")
+    end
+ if kskel <> null then do
+    call alloc_dd skeldd
+    "Lminit dataid(skel) ddname("skeldd")"
+    "LmOpen dataid("skel") Option(Output)"
+    returns = strip(returns skeldd "ISPSLIB")
+    end
+
+/* ----------------------------------------------- *
+ * Process all records in the data. stem variable. *
+ * ----------------------------------------------- */
+ do i = 1 to rec
+    record = data.i
+    recordu = translate(record)
+    if left(recordu,5) = ">END " then leave
+    if left(recordu,7) = ">CLIST " then do
+       if first = 1 then call add_it
+       type = "Clist"
+       first = 1
+       parse value record with x name
+       iterate
+       end
+    if left(recordu,6) = ">EXEC " then do
+       if first = 1 then call add_it
+       type = "Exec"
+       first = 1
+       parse value record with x name
+       iterate
+       end
+    if left(recordu,5) = ">MSG " then do
+       if first = 1 then call add_it
+       type = "Msg"
+       first = 1
+       parse value record with x name
+       iterate
+       end
+    if left(recordu,7) = ">PANEL " then do
+       if first = 1 then call add_it
+       type = "Panel"
+       first = 1
+       parse value record with x name
+       iterate
+       end
+    if left(recordu,6) = ">SKEL " then do
+       if first = 1 then call add_it
+       type = "Skel"
+       first = 1
+       parse value record with x name
+       iterate
+       end
+   /* --------------------------------------------*
+    * Put the record into the appropriate library *
+    * based on the record type.                   *
+    * ------------------------------------------- */
+    Select
+      When type = "Clist" then
+           "LmPut dataid("clist") MODE(INVAR)" ,
+                 "DataLoc(record) DataLen(255)"
+      When type = "Exec" then
+           "LmPut dataid("exec") MODE(INVAR)" ,
+                 "DataLoc(record) DataLen(255)"
+      When type = "Msg" then
+           "LmPut dataid("msg") MODE(INVAR)" ,
+                 "DataLoc(record) DataLen(80)"
+      When type = "Panel" then
+           "LmPut dataid("panel") MODE(INVAR)" ,
+                 "DataLoc(record) DataLen(80)"
+      When type = "Skel" then
+           "LmPut dataid("skel") MODE(INVAR)" ,
+                 "DataLoc(record) DataLen(80)"
+      Otherwise nop
+      end
+    end
+ if type <> null then call add_it
+/* ---------------------------------------------------- *
+ * Processing completed - now lmfree the allocation and *
+ * Libdef the library.                                  *
+ * ---------------------------------------------------- */
+ if kclist <> null then do
+    Address TSO,
+    "Altlib Act Application(Clist) File("clistdd")"
+    "LmFree dataid("clist")"
+    end
+ if kexec <> null then do
+    Address TSO,
+    "Altlib Act Application(Exec) File("execdd")"
+    "LmFree dataid("exec")"
+    end
+ if kmsg <> null then do
+    "LmFree dataid("msg")"
+    "Libdef ISPMlib Library ID("msgdd") Stack"
+    end
+ if kpanel <> null then do
+    "Libdef ISPPlib Library ID("paneldd") Stack"
+    "LmFree dataid("panel")"
+    end
+ if kskel <> null then do
+    "Libdef ISPSlib Library ID("skeldd") Stack"
+    "LmFree dataid("skel")"
+    end
+ return returns
+
+/* --------------------------- *
+ * Add the Member using LmmAdd *
+ * based upon type of resource *
+ * --------------------------- */
+ Add_It:
+ if type = "Clist" then
+    "LmmAdd dataid("clist") Member("name")"
+ if type = "Exec" then
+    "LmmAdd dataid("exec") Member("name")"
+ if type = "Msg" then
+    "LmmAdd dataid("msg") Member("name")"
+ if type = "Panel" then
+    "LmmAdd dataid("panel") Member("name")"
+ if type = "Skel" then
+    "LmmAdd dataid("skel") Member("name")"
+ type = null
+ return
+
+/* ------------------------------ *
+ * Allocate the temp ispf library *
+ * ------------------------------ */
+ Alloc_DD:
+ arg dd
+ Address TSO
+ if pos(left(dd,2),"lc le") > 0 then
+ "Alloc f("dd") unit(sysda) spa(5,5) dir(1)",
+    "recfm(v b) lrecl(255) blksize(32760)"
+ else
+ "Alloc f("dd") unit(sysda) spa(5,5) dir(1)",
+    "recfm(f b) lrecl(80) blksize(23440)"
+ return
+
+/**************************************************************
+* Trap uninitialized variables                                *
+***************************************************************/
+sub_novalue:
+Say "Variable" ,
+   condition("Description") "undefined in line" sigl":"
+Say sourceline(sigl)
+if sysvar("sysenv") <> "FORE" then exit 8
+say "Report the error in this application along with the",
+    "syntax used."
+if length(save_load) > 0 then call clean_up 8
+
+/* ------------------------ *
+ * Clean up any allocations *
+ * ------------------------ */
+ Clean_Up:
+ arg rc
+ if rc = null then rc = 0
+ if length(save_load) = 0 then exit rc
+ Address ISPExec
+ do until length(save_load) = 0
+    parse value save_load with dd libd save_load
+    if left(libd,6) = "ALTLIB" then do
+       if libd = "ALTLIBC" then lib = "CLIST"
+                           else lib = "EXEC"
+       Address TSO,
+         "Altlib Deact Application("lib")"
+       end
+    else do
+         "libdef" libd
+         end
+    address tso,
+       "free f("dd")"
+    end
+ Exit rc
+
+/* The inline definitions should be below and all within this
+   comment (so don't terminate this comment.
+>START
+>PANEL SPELLCD
+)attr default(%+_)
+  ` type(input) intens(high)  caps(off) just(right) color(yellow)
+    pad('_')
+  $ type(input) intens(high)  caps(off) just(left) color(yellow)
+  ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+  % type(text) intens(high)
+  @ type(output) just(left) caps(off) color(turq)
+)Body Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker+@ver% -\-\-
++Command ===>_zcmd
++
+~   Enter/Verify the following:
++
+~   Personal Dictionary DSN%===>_usrdict                                     +
++
+~   Verify or Change:
+~   Checking lines%===>`start ~to%===>`stop  +
++
+~   Display Progress PopUp  %===>$z  ~Yes or No
+~   Ignore words in all CAPS%===>$z  ~Yes or No
++
+~   Words Public Dictionary:$public  +
++
+   ~Please forward your list of updated words to:
+   @email
++
+   ~Press%Enter~to continue or%PF3~to cancel.
+)Init
+ .ZVARS = '(spellpg chkcaps)'
+ .help = spellch
+  /* ZENVIR format  ISPF 5.0MVS     TSO */
+  /* get the number i.e. 50             */
+  &ISPFVER1 = TRUNC (&ZENVIR,' ')
+  &ISPFVER1 = .TRAIL
+  &ISPFVER1 = TRUNC (&ISPFVER1,'.')
+  &ISPFVER2 = .TRAIL
+  &ISPFVER2 = TRUNC (&ISPFVER2,1  )
+  &ISPFVER  = '&ISPFVER1&ISPFVER2'
+  &spellpg = trans(trunc(&spellpg,1) y,Yes n,&z Y,Yes N,No &z,No)
+  &chkcaps = trans(trunc(&chkcaps,1) y,Yes n,&z Y,Yes N,No &z,No)
+)Proc
+ IF (&ISPFVER < 44      )
+   &DSN = &usrdict
+   IF (&DSN   NE ' ')                   /* IF DSN IS SPECIFIED      */
+      &ZFC = TRUNC(&DSN,1)              /* IF FIRST CHARACTER       */
+      IF (&ZFC = '''')                  /*  OF DSN IS "'" CHECK     */
+        &ZREM = .TRAIL                  /*  TO SEE IF LAST "'"      */
+        &ZREM2 = TRUNC(&ZREM,'''')      /*  IS MISSING.             */
+        IF (&ZREM2 = &ZREM)             /*  IF LAST "'" MISSING     */
+          &DSN = '&DSN&ZFC'             /*    ADD IT TO THE END     */
+          &usrdict = &DSN
+   ver (&usrdict,dsname)
+ ELSE
+   ver (&usrdict,dsnameq)
+ &spellpg = trans(trunc(&spellpg,1) y,Yes Y,Yes n,No N,No *,*)
+ ver (&spellpg,list,Yes,No,&z)
+ &chkcaps = trans(trunc(&chkcaps,1) y,Yes Y,Yes n,No N,No *,*)
+ ver (&chkcaps,list,Yes,No,&z)
+ Vput (usrdict spellpg chkcaps) Profile
+)End
+>PANEL SPELLCH
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(off) just(left )
+   % type(text) intens(high)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   ` type(text) intens(high) color(turq)
+  @ type(output) color(blue) just(left) caps(off) color(turq)
+)Body Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker Help+@ver%-\-\-
++Command%===>_zcmd
+`
+%SPELLC`is an ISPF Edit Macro that will do a basic spelling verification on
+`the file currently active in ISPF Edit. Note that the file does NOT have to
+`be saved first.
+`
+`Before spelling verification begins each record is scanned and special
+`characters are translated to blank. These characters include :,?()*=;<>Ý¨!
+`after which each word will have all surrounding quotes ' and " removed as
+`well as any trailing periods.
+`
+`The personal dictionary is any sequential data set, or PDS member, with a
+`list of words separated by blanks on as many records as needed.
+`
+`The user can call the%SPELLC`command with a starting and ending line number
+`or line label, or with no parameters. The%SPELLCA`command can be used to add
+`a word to your personal dictionary by entering%SPELLCA`on the command line and
+`placing the cursor on the desired word - then pressing enter.
+`
+`The spelling verification is not exhaustive but is an excellent start for
+`those of us who need a little extra help with our spelling.
+)Init
+)Proc
+)End
+>PANEL SPELLCP
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(off) just(left )
+   ` type(output) intens(high)  caps(off) just(left ) color(yellow)
+     just(right)
+   $ type(output) intens(high)  caps(off) just(left ) color(yellow)
+   % type(text) intens(high)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+  @ type(output) color(blue) just(left) caps(off) color(turq)
+)Body Window(60,10) Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker+@ver% -\-\-
++Processing word:$word
++
++Errors so far:         `errors  +
++Unique words in error: `invalidw+
++Total words processed: `total   +
++Input record count:    `l       +to`stop    +
++Personal Dictionary:   `private +
++Public Dictionary:     `public  +
++Elapsed time:       `et         +
+)Proc
+)End
+>End of the inline panels */

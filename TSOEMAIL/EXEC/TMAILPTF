@@ -1,0 +1,119 @@
+        /* ---------------------  rexx procedure  ---------------------- */
+        /* Name:      TMAILPTF                                           */
+        /*                                                               */
+        /* Function:  Un-Terse Files from IBMLINK                        */
+        /*                                                               */
+        /*            Called by the TSOMAIL Rexx Procedure               */
+        /*                                                               */
+        /* Syntax:    %TMAILPTF orig-dsn tsomail-dsn target-dsn          */
+        /*                                                               */
+        /*            orig-dsn   Original DSn as deteremined by          */
+        /*                       TSOMAIL during the RECEIVE process.     */
+        /*            tsomail-dsn  This is the data set that TSOMAIL     */
+        /*                       placed the data into during the         */
+        /*                       RECEIVE.                                */
+        /*            target-dsn   This is optional and is the data set  */
+        /*                       name into which the PTF will be         */
+        /*                       untersed.                               */
+        /*                                                               */
+        /*            Defaults:                                          */
+        /*            orig-dsn    -  none                                */
+        /*            tsomail-dsn -  none                                */
+        /*            target-dsn  -  userid.IBMLINK.xxxxxxxx             */
+        /*                           where xxxxxxxx is the qualifier     */
+        /*                           that immediately preceeds the       */
+        /*                           ".SERVLINK" suffix of the           */
+        /*                           orig-dsn.                           */
+        /*                                                               */
+        /* Author:    Lionel B. Dyck                                     */
+        /*            Kaiser Permanente Information Technology           */
+        /*            25 N. Via Monte Ave.                               */
+        /*            Walnut Creek, CA 94598                             */
+        /*            (925) 926-5332                                     */
+        /*            Internet: lionel.b.dyck@kp.org                     */
+        /*                                                               */
+        /* History:                                                      */
+        /*            02/27/92 - Lionel Dyck                             */
+        /*            Add variable 'vio' for VIO generic unit type       */
+        /*                                                               */
+        /*            03/28/91 - Lionel Dyck                             */
+        /*            Remove DCB from output file allocation to allow    */
+        /*            for FB and VB files to be untersed                 */
+        /*                                                               */
+        /*            01/08/91 - Lionel Dyck                             */
+        /*            Update to indicate called by TSOMAIL exec          */
+        /*                                                               */
+        /*            07/09/90 - Lionel Dyck                             */
+        /*            Update to work with TMAILFIL exec                  */
+        /*                                                               */
+        /*            07/05/90 - Lionel Dyck                             */
+        /*            Creation of Rexx Procedure                         */
+        /*                                                               */
+        /* ------------------------------------------------------------- */
+
+        arg mailfds mailtds targdsn
+
+        if options = '' then exit 12
+
+        parse value mailfds with "A." ptfname ".SERVLINK" c
+        vio = "SYSVIO"
+
+        x = msg("off")
+
+        x = listdsi(mailtds)
+        if syslrecl ¬= 1024 then do
+           parse value "" with ptferr1 ptferr2 ptferr3 ptferr4 ptferr5 ptferr6,
+                               ptferr7 ptferr8 ptferr9 ptferr10
+              ptferr2 = "The requested File does not have the correct DCB"
+              ptferr3 = "characteristics to be a tersed file."
+              ptferr5 = "Browse the file to verify it's contents."
+              ptferr6 = "Tersed files should be",
+                        "DCB=(RECFM=F,LRECL=1024,BLKSIZE=1024*n)"
+              ptferr7 = "otherwise it is not a valid terse",
+                        "file for MVS Unterse."
+              ptferr9 = "Original Data Set:" mailfds
+              ptferr10 = "TSO Mail Data Set:" mailtds
+              Address ISPEXEC "DISPLAY PANEL(TMAILPTE)"
+              exit 0
+              end
+
+        "FREE F(SYSPRINT INFILE OUTFILE)"
+
+        "ALLOC F(SYSPRINT) UNIT("vio") SPACE(1,1) TRACKS REUSE"
+
+        parse value mailfds with "A." ptfname ".SERVLINK" waste
+
+        if targdsn = "" then targdsn = "IBMLINK."ptfname
+
+        "DEL" targdsn
+
+        "ALLOC F(OUTFILE) DS("targdsn") NEW SPACE(30,30) TRACKS REUSE"
+
+        "ALLOC F(INFILE) DS("mailtds") SHR"
+
+        Address Link "Trsunpck" 'unpack'
+        /* "CALL 'AISC.VENDOR.LOAD(TRSUNPCK)' 'UNPACK'" */
+
+        lc = rc
+
+        if rc ¬= 0 then do
+           out. = ""
+           "EXECIO * DISKR SYSPRINT (FINIS STEM out."
+           parse value "" with ptferr1 ptferr2 ptferr3 ptferr4 ptferr5 ptferr6,
+                               ptferr7 ptferr8 ptferr9 ptferr10
+              ptferr1  = out.1
+              ptferr2  = out.2
+              ptferr3  = out.3
+              ptferr4  = out.4
+              ptferr5  = out.5
+              ptferr6  = out.6
+              ptferr7  = out.7
+              ptferr8  = out.8
+              ptferr9  = out.9
+              ptferr10 = out.10
+              Address ISPEXEC "DISPLAY PANEL(TMAILPTE)"
+              end
+              else Address ISPEXEC "DISPLAY PANEL(TMAILPTF)"
+
+        "FREE F(SYSPRINT INFILE OUTFILE)"
+        "ALLOC F(SYSPRINT) DS(*)"

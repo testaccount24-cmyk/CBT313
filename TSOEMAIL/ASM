@@ -1,0 +1,909 @@
+./ ADD NAME=$README  0105-90306-94189-1505-00020-00013-00000-$A1238
+This library contains the source for:
+
+
+TMAILQRY
+
+   This routine is to be assembled and linked into LPALIB (for performance)
+   or LINKLIB and is used to return a return code indicating if there
+   is mail to be received for the user.
+
+SHOWTSO and subroutine SHOW
+
+   ** get the show.zip file for the show function
+   ** moved to enable others to more easily get the show files
+
+J2MXZ02  - JES2 Version of INMXZ02 TSO Exit
+J3MXZ02  - JES3 Version of INMXZ02 TSO Exit
+
+   With thanks to Sam Lepore for providing the original of this code.
+
+We make no guarentees about this code.
+./ ADD NAME=J2MXZ02
+***********************************************************************
+*                                                                     *
+*   MODULE NAME:  INMXZ02                                             *
+*                                                                     *
+*   DESCRIPTION:  WELLS FARGO BANK TSO/E TRANSMIT TERMINATION EXIT    *
+*                                                                     *
+*        STATUS:  TSO/E RELEASE 2.0                                   *
+*                                                                     *
+*      FUNCTION:  ISSUE EQUIVALENT OF "$HASP549 MAIL FROM" MESSAGE    *
+*                 TO NOTIFY RECEIVING USERS OF LOCAL NODE TRANSMIT.   *
+*                 (LOCAL TRANSMIT DOES NOT PASS THROUGH JES EXIT 13). *
+*                                                                     *
+*     OPERATION:  -  SEARCH ADDRESS LIST FOR LOCAL NODE.              *
+*                 -  IF FOUND, VERIFY OUTPUT TARGET IS JES SYSOUT     *
+*                      AND TRANSMISSION SUCCESSFULLY COMPLETED.       *
+*                 -  ISSUE "SE '$HASP549...',USER=(),LOGON" VIA SVC34 *
+*                 -  ALWAYS RETURN CONDITION ZERO (CONTINUE TRANSMIT).*
+*                                                                     *
+*     REGISTERS:  R0  -  PARM/WORK REGISTER                           *
+*                 R1  -  PARM/WORK REGISTER                           *
+*                 R2  -  WORK REGISTER (ALSO USED TO PASS RC TO R15)  *
+*                 R3  -  POINTER TO FROM-NODE NAME                    *
+*                 R4  -  MACHINE LENGTH OF FROM-NODE NAME             *
+*                 R5  -  POINTER TO CURRENT TO-USER DATA              *
+*                 R6  -  POINTER TO FROM-USER ID                      *
+*                 R7  -  MACHINE LENGTH OF FROM-USER ID               *
+*                 R8  -  MACHINE LENGTH OF NUMBER OF RECORDS XMITED   *
+*                 R11 -  POINTER TO INPUT PARAMETER LIST              *
+*                 R12 -  BASE REGISTER                                *
+*                 R13 -  BASE REGISTER FOR WORKAREA                   *
+*                 R14 -  RETURN REGISTER                              *
+*                 R15 -  RETURN CODE REGISTER                         *
+*                                                                     *
+*    ATTRIBUTES:  KEY 8, PROBLEM STATE, APF ON, REENTRANT             *
+*                                                                     *
+*         INPUT:  R1, POINTER TO PARAMETER LIST, SEE PL@LIST          *
+*                                                                     *
+*        OUTPUT:  TSO MAIL MESSAGE ISSUED VIA OPERATOR SEND COMMAND   *
+*                                                                     *
+*          EXIT:  ALWAYS CONDITION CODE ZERO - CONTINUE TRANSMIT      *
+*                                                                     *
+*  CONTROL BLKS:  NONE (SVC 34 PARAMETER LIST BUILT DYNAMICALLY)      *
+*                                                                     *
+* MACROS & SVCS:  FREEMAIN, GETMAIN, RETURN, SAVE, SVC 34             *
+*                                                                     *
+*   ABEND CODES:  NONE                                                *
+***********************************************************************
+         EJECT
+***********************************************************************
+*                                                                     *
+*    CHANGE LOG:  SAM LEPORE     JANUARY 1985                         *
+*                   ORIGINAL VERSION                                  *
+*                                                                     *
+***********************************************************************
+         EJECT
+*
+***********************************************************************
+*        INITIALIZATION                                               *
+***********************************************************************
+*
+INMXZ02  CSECT
+         SAVE  (14,12),,INMXZ02_V1.0_&SYSDATE_&SYSTIME
+         LR    R12,R15                 SAVE ENTRY POINT
+         USING INMXZ02,R12             SET UP BASE REGISTER
+         LR    R11,R1                  COPY PARM LIST ADDRESS
+         USING PL@LIST,R11             ESTABLISH ADDRESSABILITY
+         GETMAIN RU,LV=WORKLEN         OBTAIN STORAGE
+         ST    R13,4(,R1)              CHAIN SAVE AREAS
+         ST    R1,8(,R13)
+         LR    R13,R1                  NEW SAVEAREA
+         USING WORKAREA,R13            ESTABLISH ADDRESSABILITY
+*
+***********************************************************************
+*        VERIFY DATA WAS SENT TO SYSOUT (NOT TO DATASET OR DDNAME)    *
+***********************************************************************
+*
+         L     R2,PLSTAFLG             ADDRESS 1 BYTE STATUS FLAGS
+         TM    0(R2),PLNOTJES          DID OUTPUT GO NON-JES ?
+         BO    RETURN0                 YES, DONE (NOTHING REALLY XMITD)
+*
+***********************************************************************
+*        ONE OF THE ENRTY PARAMETERS POINTS TO A TWO TEXT UNIT LIST   *
+*        THAT DESCRIBES THE TRANSMITTING USER:                        *
+*        PARM  ==> +0 POINTER ==> USERID TEXT UNIT                    *
+*                  +4 POINTER ==> NODE TEXT UNIT                      *
+*                                                                     *
+*        NOTE: EVERY TEXT UNIT (T/U) IS OF THE FOLLOWING FORMAT       *
+*      +0  KEY   DS  XL2    TYPE OF T/U               (EG. X'1011'  ) *
+*      +2  NUM   DS  XL2    NUMBER OF LEN+PARM PAIRS  (    X'0001'  ) *
+*      +4  LEN   DS  XL2    LENGTH OF PARM VALUE      (    X'0006'  ) *
+*      +6  PARM  DS  ....   ACTUAL PARAMETER          (    C'SFTEST') *
+*                                                                     *
+***********************************************************************
+*
+         L     R2,PLFUTXTU             ADDRESS "FROM" T/U POINTER LIST
+         L     R3,4(,R2)               ADDRESS SECOND T/U
+         LH    R4,4(,R3)               GET LENGTH OF FROM-NODE
+         BCTR  R4,0                    DECREMENT FOR EXECUTE
+         LA    R3,6(,R3)               POINT TO FROM-NODE NAME
+*
+         L     R6,0(,R2)               ADDRESS FIRST T/U
+         LH    R7,4(,R6)               GET LENGTH OF FROM-USER
+         BCTR  R7,0                    DECREMENT FOR EXECUTE
+         LA    R6,6(,R6)               POINT TO FROM-USER ID
+*
+         L     R2,PLNUMREC             ADDRESS NUMBER RECORDS XMITED
+         L     R2,0(,R2)               GET NUMBER
+         CVD   R2,DBLWORD              CONVERT TO PACKED DECIMAL FORMAT
+         MVC   RECSXMIT,RECXMASK       MOVE IN PATTERN MASK
+         LA    R1,RECSXMIT+7           DEFAULT TO LAST DIGIT AS SIGNIF
+         LR    R8,R1                   SAVE FOR LENGTH COMPUTATION
+         EDMK  RECSXMIT,DBLWORD+4      CONVERT TO PRINTABLE
+         MVC   RECSXMIT(7),0(R1)       SLIDE RESULT LEFT (MAX 7 CHARS)
+         SR    R8,R1                   GET MACHINE LENGTH OF RESULT
+*
+***********************************************************************
+*        SEARCH ADDRESS LIST FOR LOCAL NODE                           *
+***********************************************************************
+*
+         LA    R5,PLTULIST             POINT TO ADDRESS OF DATA CHAIN
+         USING AL@LIST,R5
+NEXTUSER EQU   *
+         ICM   R5,B'1111',ALNEXT       ADDRESS NEXT TO-USER DATA
+         BZ    RETURN0                 END OF CHAIN
+         EX    R4,CLCNODE              COMPARE FROM/TO NODE NAMES
+         BNE   NEXTUSER                NOT EQUAL, RECV JES2 WILL VERIFY
+*
+***********************************************************************
+*        VERIFY TRANSMISSION WAS SUCCESSFULLY COMPLETED               *
+***********************************************************************
+*
+         TM    ALFLAG,ALXMITOK         TRANSMIT SUCCESSFUL ?
+         BNO   NEXTUSER                NO, IGNORE
+*
+***********************************************************************
+*        ISSUE: $HASP549 MAIL FROM(NODENAME/USERID ) RECORDS(NNNNNNN) *
+*           BY: SE '$HASP549 ...',LOGON,USER=(USERID)                 *
+*        USING: SVC 34 TO GENERATE AN "INTERNAL CONSOLE COMMAND"      *
+***********************************************************************
+*
+         MVC   MSGAREA(SE549LEN),SE549HDR  MOVE "SE '$HASP549 " HEADER
+         LA    R1,MSGAREA+SE549LEN     POINT TO NEXT BYTE FOR NODENAME
+         EX    R4,MVCNODE              MOVE IN FROM-NODE
+         LA    R1,1(R4,R1)             POINT TO BYTE AFTER NODENAME
+         MVI   0(R1),C'/'              MOVE IN SEPARATOR SLASH
+         EX    R7,MVCFUID              MOVE IN FROM-USER ID
+         LA    R1,2(R7,R1)             POINT TO BYTE AFTER FROM-USER ID
+         MVC   0(L'SE549REC,R1),SE549REC  MOVE IN ') RECORDS(' LITERAL
+         EX    R8,MVCRECX              MOVE IN NUMBER RECORDS XMITED
+         LA    R1,L'SE549REC+1(R8,R1)  POINT TO BYTE AFTER NUM REC XMIT
+         MVC   0(L'SE549LGN,R1),SE549LGN  MOVE IN 'LOGON,USER=' LITERAL
+         LH    R2,ALUSERL              GET LENGTH OF TO-USER ID
+         BCTR  R2,0                    DECREMENT FOR MACHINE LENGTH
+         EX    R2,MVCTUID              MOVE IN TO-USER ID
+         LA    R1,L'SE549LGN+1(R2,R1)  POINT TO BYTE AFTER TO-USER ID
+         MVI   0(R1),C')'              MOVE IN FINAL RIGHT PARENTHESIS
+         LA    R2,MSGAREA-1            POINT TO BEGINNING (MINUS 1)
+         SR    R1,R2                   GET REAL LENGTH OF COMPLETE MSG
+         STH   R1,MSGAREA              STORE IN FIRST HALFWORD FOR SVC
+         MODESET KEY=ZERO
+         SR    R0,R0                   NO CONSOLE NUMBER
+         LA    R1,MSGAREA              POINT TO PARAMETER
+         SVC   34                      ISSUE COMMAND
+         MODESET KEY=NZERO
+         B     NEXTUSER                GO CHECK THE NEXT TO-USER
+*
+***********************************************************************
+*        SET ZERO RETURN CODE                                         *
+***********************************************************************
+*
+RETURN0  EQU   *
+         SR    R2,R2                   ZERO RETURN CODE
+*
+***********************************************************************
+*        RETURN ROUTINE                                               *
+***********************************************************************
+*
+RETURN   EQU   *
+         LR    R1,R13                  SAVE POINTER OF STORAGE
+         L     R13,4(,R13)             GET OLD SAVEAREA ADDRESS
+         FREEMAIN RU,LV=WORKLEN,A=(1)  FREE STORAGE
+         LR    R15,R2                  PASS RETURN CODE TO R15
+         RETURN (14,12),RC=(15)        AND RETURN
+         SPACE 3
+*
+***********************************************************************
+*        LITERALS AND CONSTANTS                                       *
+***********************************************************************
+*
+CLCNODE  CLC   0(0,R3),ALNODE          (EXECUTED) COMPARE FROM/TO NODE
+MVCNODE  MVC   0(0,R1),0(R3)           (EXECUTED) MOVE FROM-NODE TO MSG
+MVCFUID  MVC   1(0,R1),0(R6)           (EXECUTED) MOVE FROM-USER TO MSG
+MVCRECX  MVC   L'SE549REC(0,R1),RECSXMIT (EXECUTED) MOVE NUM RECS XMITD
+MVCTUID  MVC   L'SE549LGN(0,R1),ALUSER   (EXECUTED) MOVE TO-USER TO MSG
+RECXMASK DC    X'4020202020202120'     PATTERN MASK TO EDITMARK REC NUM
+*
+SE549HDR DS    0F                      SVC34 PARMS MUST BE WORD BOUNDRY
+         DC    H'0'                    LENGTH INCLUDING PREFIX
+         DC    H'0'                    FILLER REQUIRED BY SVC34
+         DC    C'SE ''$HASP549 MAIL FROM('
+SE549LEN EQU   *-SE549HDR              LENGTH OF HEADER
+SE549REC DC    C') RECORDS('
+SE549LGN DC    C')'',LOGON,USER=('
+*
+         LTORG
+         SPACE 3
+R0       EQU   0
+R1       EQU   1
+R2       EQU   2
+R3       EQU   3
+R4       EQU   4
+R5       EQU   5
+R6       EQU   6
+R7       EQU   7
+R8       EQU   8
+R9       EQU   9
+R10      EQU   10
+R11      EQU   11
+R12      EQU   12
+R13      EQU   13
+R14      EQU   14
+R15      EQU   15
+*
+***********************************************************************
+*        DSECTS AND MAPPING MACROES                                   *
+***********************************************************************
+*
+WORKAREA DSECT
+SAVEAREA DS    9D                      STANDARD REGISTER SAVEAREA
+DBLWORD  DS    D                       DOUBLE WORD FOR CONVERT-PRINT
+RECSXMIT DS    XL8                     RECORDS TRANSMITTED (PRINTABLE)
+MSGAREA  DS    0F,CL128                MSG CREATION AREA (ON FULLWORD!)
+WORKLEN  EQU   *-WORKAREA
+*
+***********************************************************************
+*        LOCAL MAPPING FOR INMZX02 ENTRY PARAMETER LIST               *
+***********************************************************************
+*
+PL@LIST  DSECT                         ENTRY PARAMETER LIST
+PLUSERWD DS    A                       ADDR OF A USER WORD
+PLXMKWDP DS    A                       ADDR OF KEYWORD PARM('STRING')
+PLACTFLG DS    A                       ADDR OF 1 BYTE ACTION FLAGS
+PLTSCPPL DS    A                       ADDR OF TSO CMD PROCSR PARM LIST
+PLXMEMSG DS    A                       ADDR OF ERR MSG XMIT TO ISSUE
+PLSTAFLG DS    A                       ADDR OF 1 BYTE STATUS FLAGS
+PLNOTJES EQU   X'80'                     OUTPUT NOT JES (IS DSN OR DD)
+PLFUTXTU DS    A                       ADDR OF FROM-USER TEXT UNITS
+PLFDTXTU DS    A                       ADDR OF FROM-DATASET TEXT UNITS
+PLTULIST DS    A                       ADDR OF TO-USER DATA CHAIN
+PLNUMREC DS    A                       ADDR OF WORD, NUM RECORDS XMITED
+PLXMITRC DS    A                       ADDR OF WORD, TRANSMIT CMD RETCD
+*
+***********************************************************************
+*        LOCAL MAPPING FOR ADDRESS LIST DATA CHAIN OF TO-USERS        *
+***********************************************************************
+*
+AL@LIST  DSECT                         ADDRESS LIST CHAIN OF TO-USERS
+ALNEXT   DS    A                       ADDR OF NEXT ENTRY, OR ZERO
+ALNODEL  DS    H                       LENGTH OF TARGET NODE NAME
+ALNODE   DS    CL8                     TARGET NODE NAME
+ALUSERL  DS    H                       LENGTH OF TARGET USERID
+ALUSER   DS    CL8                     TARGET USERID
+ALNICKL  DS    H                       LENGTH OF NICKNAME, OR ZERO
+ALNICK   DS    CL8                     NICKNAME OF USERID
+ALNAMEL  DS    H                       LENGTH OF NAME TAG, OR ZERO
+ALNAME   DS    CL30                    NAME TAG OF USERID
+ALFLAG   DS    X                       FLAG BYTE
+ALNOTIFY EQU   X'80'                     REQUEST NOTIFY FOR THIS USERID
+ALXMITOK EQU   X'20'                     XMIT SUCCESFULLY COMPLETED
+         DS    X                       (RESERVED)
+ALPARML  DS    H                       LENGTH OF PARM TAG, OR ZERO
+ALPARM   DS    CL30                    PARM TAG OF USERID
+*
+         END
+./ ADD NAME=J3MXZ02  0101-88265-91217-0717-00281-00281-00000-$A1238
+***********************************************************************
+*                                                                     *
+*   MODULE NAME:  INMXZ02                                             *
+*                                                                     *
+*   DESCRIPTION:  ROCKWELL INTERNATIONAL TRANSMIT TERMINATION EXIT    *
+*                                                                     *
+*        STATUS:  TSO/E RELEASE 2.0                                   *
+*                                                                     *
+*      FUNCTION:  ISSUE EQUIVALENT OF "IAT9154 FILE FROM" MESSAGE     *
+*                 TO NOTIFY RECEIVING USERS OF LOCAL NODE TRANSMIT.   *
+*                 (LOCAL TRANSMIT DOES NOT PASS THROUGH JES3 CODE).   *
+*                                                                     *
+*     OPERATION:  -  SEARCH ADDRESS LIST FOR LOCAL NODE.              *
+*                 -  IF FOUND, VERIFY OUTPUT TARGET IS JES SYSOUT     *
+*                      AND TRANSMISSION SUCCESSFULLY COMPLETED.       *
+*                 -  ISSUE "SE 'RAT9154...',USER=(),LOGON" VIA SVC34 *
+*                 -  ALWAYS RETURN CONDITION ZERO (CONTINUE TRANSMIT).*
+*                                                                     *
+*     REGISTERS:  R0  -  PARM/WORK REGISTER                           *
+*                 R1  -  PARM/WORK REGISTER                           *
+*                 R2  -  WORK REGISTER (ALSO USED TO PASS RC TO R15)  *
+*                 R3  -  POINTER TO FROM-NODE NAME                    *
+*                 R4  -  MACHINE LENGTH OF FROM-NODE NAME             *
+*                 R5  -  POINTER TO CURRENT TO-USER DATA              *
+*                 R6  -  POINTER TO FROM-USER ID                      *
+*                 R7  -  MACHINE LENGTH OF FROM-USER ID               *
+*                 R8  -  MACHINE LENGTH OF NUMBER OF RECORDS XMITED   *
+*                 R11 -  POINTER TO INPUT PARAMETER LIST              *
+*                 R12 -  BASE REGISTER                                *
+*                 R13 -  BASE REGISTER FOR WORKAREA                   *
+*                 R14 -  RETURN REGISTER                              *
+*                 R15 -  RETURN CODE REGISTER                         *
+*                                                                     *
+*    ATTRIBUTES:  KEY 8, PROBLEM STATE, APF ON, REENTRANT             *
+*                                                                     *
+*         INPUT:  R1, POINTER TO PARAMETER LIST, SEE PL@LIST          *
+*                                                                     *
+*        OUTPUT:  TSO MAIL MESSAGE ISSUED VIA OPERATOR SEND COMMAND   *
+*                                                                     *
+*          EXIT:  ALWAYS CONDITION CODE ZERO - CONTINUE TRANSMIT      *
+*                                                                     *
+*  CONTROL BLKS:  NONE (SVC 34 PARAMETER LIST BUILT DYNAMICALLY)      *
+*                                                                     *
+* MACROS & SVCS:  FREEMAIN, GETMAIN, RETURN, SAVE, SVC 34             *
+*                                                                     *
+*   ABEND CODES:  NONE                                                *
+***********************************************************************
+         EJECT
+***********************************************************************
+*                                                                     *
+*    CHANGE LOG:  SAM LEPORE     JANUARY 1985                         *
+*                   ORIGINAL VERSION                                  *
+*                                                                     *
+*                 LIONEL DYCK    JANUARY 1987                         *
+*                  ROCKWELL INTERNATIONAL 110-SH28                    *
+*                  2201 SEAL BEACH BLVD                               *
+*                  SEAL BEACH, CA 90740                               *
+*                  213-797-1125                                       *
+*                CHANGE FROM $HASP MSG TO IAT (JES3) MESSAGE)         *
+*                                                                     *
+***********************************************************************
+         EJECT
+*
+***********************************************************************
+*        INITIALIZATION                                               *
+***********************************************************************
+*
+INMXZ02  CSECT
+         SAVE  (14,12),,INMXZ02_V1.0_&SYSDATE
+         LR    R12,R15                 SAVE ENTRY POINT
+         USING INMXZ02,R12             SET UP BASE REGISTER
+         LR    R11,R1                  COPY PARM LIST ADDRESS
+         USING PL@LIST,R11             ESTABLISH ADDRESSABILITY
+         GETMAIN RU,LV=WORKLEN         OBTAIN STORAGE
+         ST    R13,4(,R1)              CHAIN SAVE AREAS
+         ST    R1,8(,R13)
+         LR    R13,R1                  NEW SAVEAREA
+         USING WORKAREA,R13            ESTABLISH ADDRESSABILITY
+*
+***********************************************************************
+*        VERIFY DATA WAS SENT TO SYSOUT (NOT TO DATASET OR DDNAME)    *
+***********************************************************************
+*
+         L     R2,PLSTAFLG             ADDRESS 1 BYTE STATUS FLAGS
+         TM    0(R2),PLNOTJES          DID OUTPUT GO NON-JES ?
+         BO    RETURN0                 YES, DONE (NOTHING REALLY XMITD)
+*
+***********************************************************************
+*        ONE OF THE ENRTY PARAMETERS POINTS TO A TWO TEXT UNIT LIST   *
+*        THAT DESCRIBES THE TRANSMITTING USER:                        *
+*        PARM  ==> +0 POINTER ==> USERID TEXT UNIT                    *
+*                  +4 POINTER ==> NODE TEXT UNIT                      *
+*                                                                     *
+*        NOTE: EVERY TEXT UNIT (T/U) IS OF THE FOLLOWING FORMAT       *
+*      +0  KEY   DS  XL2    TYPE OF T/U               (EG. X'1011'  ) *
+*      +2  NUM   DS  XL2    NUMBER OF LEN+PARM PAIRS  (    X'0001'  ) *
+*      +4  LEN   DS  XL2    LENGTH OF PARM VALUE      (    X'0006'  ) *
+*      +6  PARM  DS  ....   ACTUAL PARAMETER          (    C'SFTEST') *
+*                                                                     *
+***********************************************************************
+*
+         L     R2,PLFUTXTU             ADDRESS "FROM" T/U POINTER LIST
+         L     R3,4(,R2)               ADDRESS SECOND T/U
+         LH    R4,4(,R3)               GET LENGTH OF FROM-NODE
+         BCTR  R4,0                    DECREMENT FOR EXECUTE
+         LA    R3,6(,R3)               POINT TO FROM-NODE NAME
+*
+         L     R6,0(,R2)               ADDRESS FIRST T/U
+         LH    R7,4(,R6)               GET LENGTH OF FROM-USER
+         BCTR  R7,0                    DECREMENT FOR EXECUTE
+         LA    R6,6(,R6)               POINT TO FROM-USER ID
+*
+         L     R2,PLNUMREC             ADDRESS NUMBER RECORDS XMITED
+         L     R2,0(,R2)               GET NUMBER
+         CVD   R2,DBLWORD              CONVERT TO PACKED DECIMAL FORMAT
+         MVC   RECSXMIT,RECXMASK       MOVE IN PATTERN MASK
+         LA    R1,RECSXMIT+7           DEFAULT TO LAST DIGIT AS SIGNIF
+         LR    R8,R1                   SAVE FOR LENGTH COMPUTATION
+         EDMK  RECSXMIT,DBLWORD+4      CONVERT TO PRINTABLE
+         MVC   RECSXMIT(7),0(R1)       SLIDE RESULT LEFT (MAX 7 CHARS)
+         SR    R8,R1                   GET MACHINE LENGTH OF RESULT
+*
+***********************************************************************
+*        SEARCH ADDRESS LIST FOR LOCAL NODE                           *
+***********************************************************************
+*
+         LA    R5,PLTULIST             POINT TO ADDRESS OF DATA CHAIN
+         USING AL@LIST,R5
+NEXTUSER EQU   *
+         ICM   R5,B'1111',ALNEXT       ADDRESS NEXT TO-USER DATA
+         BZ    RETURN0                 END OF CHAIN
+         EX    R4,CLCNODE              COMPARE FROM/TO NODE NAMES
+         BNE   NEXTUSER                NOT EQUAL, RECV JES2 WILL VERIFY
+*
+***********************************************************************
+*        VERIFY TRANSMISSION WAS SUCCESSFULLY COMPLETED               *
+***********************************************************************
+*
+         TM    ALFLAG,ALXMITOK         TRANSMIT SUCCESSFUL ?
+         BNO   NEXTUSER                NO, IGNORE
+*
+***********************************************************************
+*        ISSUE: RAT9154 FILE FROM NODENAME  /USERID  RECORDS(NNNNNNN) *
+*           BY: SE 'RAT9154 ...',LOGON,USER=(USERID)                  *
+*        USING: SVC 34 TO GENERATE AN "INTERNAL CONSOLE COMMAND"      *
+***********************************************************************
+*
+         MVC   MSGAREA(SE549LEN),SE549HDR  MOVE "SE 'RAT9154 " HEADER
+         LA    R1,MSGAREA+SE549LEN     POINT TO NEXT BYTE FOR NODENAME
+         EX    R4,MVCNODE              MOVE IN FROM-NODE
+         LA    R1,1(R4,R1)             POINT TO BYTE AFTER NODENAME
+         MVI   0(R1),C'/'              MOVE IN SEPARATOR SLASH
+         EX    R7,MVCFUID              MOVE IN FROM-USER ID
+         LA    R1,2(R7,R1)             POINT TO BYTE AFTER FROM-USER ID
+         MVC   0(L'SE549REC,R1),SE549REC  MOVE IN ') RECORDS(' LITERAL
+         EX    R8,MVCRECX              MOVE IN NUMBER RECORDS XMITED
+         LA    R1,L'SE549REC+1(R8,R1)  POINT TO BYTE AFTER NUM REC XMIT
+         MVC   0(L'SE549LGN,R1),SE549LGN  MOVE IN 'LOGON,USER=' LITERAL
+         LH    R2,ALUSERL              GET LENGTH OF TO-USER ID
+         BCTR  R2,0                    DECREMENT FOR MACHINE LENGTH
+         EX    R2,MVCTUID              MOVE IN TO-USER ID
+         LA    R1,L'SE549LGN+1(R2,R1)  POINT TO BYTE AFTER TO-USER ID
+         MVI   0(R1),C')'              MOVE IN FINAL RIGHT PARENTHESIS
+         LA    R2,MSGAREA-1            POINT TO BEGINNING (MINUS 1)
+         SR    R1,R2                   GET REAL LENGTH OF COMPLETE MSG
+         STH   R1,MSGAREA              STORE IN FIRST HALFWORD FOR SVC
+         MODESET KEY=ZERO
+         SR    R0,R0                   NO CONSOLE NUMBER
+         LA    R1,MSGAREA              POINT TO PARAMETER
+         SVC   34                      ISSUE COMMAND
+         MODESET KEY=NZERO
+         B     NEXTUSER                GO CHECK THE NEXT TO-USER
+*
+***********************************************************************
+*        SET ZERO RETURN CODE                                         *
+***********************************************************************
+*
+RETURN0  EQU   *
+         SR    R2,R2                   ZERO RETURN CODE
+*
+***********************************************************************
+*        RETURN ROUTINE                                               *
+***********************************************************************
+*
+RETURN   EQU   *
+         LR    R1,R13                  SAVE POINTER OF STORAGE
+         L     R13,4(,R13)             GET OLD SAVEAREA ADDRESS
+         FREEMAIN RU,LV=WORKLEN,A=(1)  FREE STORAGE
+         LR    R15,R2                  PASS RETURN CODE TO R15
+         RETURN (14,12),RC=(15)        AND RETURN
+         SPACE 3
+*
+***********************************************************************
+*        LITERALS AND CONSTANTS                                       *
+***********************************************************************
+*
+CLCNODE  CLC   0(0,R3),ALNODE          (EXECUTED) COMPARE FROM/TO NODE
+MVCNODE  MVC   0(0,R1),0(R3)           (EXECUTED) MOVE FROM-NODE TO MSG
+MVCFUID  MVC   1(0,R1),0(R6)           (EXECUTED) MOVE FROM-USER TO MSG
+MVCRECX  MVC   L'SE549REC(0,R1),RECSXMIT (EXECUTED) MOVE NUM RECS XMITD
+MVCTUID  MVC   L'SE549LGN(0,R1),ALUSER   (EXECUTED) MOVE TO-USER TO MSG
+RECXMASK DC    X'4020202020202120'     PATTERN MASK TO EDITMARK REC NUM
+*
+SE549HDR DS    0F                      SVC34 PARMS MUST BE WORD BOUNDRY
+         DC    H'0'                    LENGTH INCLUDING PREFIX
+         DC    H'0'                    FILLER REQUIRED BY SVC34
+         DC    C'SE ''RAT9154 FILE FROM '
+SE549LEN EQU   *-SE549HDR              LENGTH OF HEADER
+SE549REC DC    C'  RECORDS('
+SE549LGN DC    C')'',LOGON,USER=('
+*
+         LTORG
+         SPACE 3
+R0       EQU   0
+R1       EQU   1
+R2       EQU   2
+R3       EQU   3
+R4       EQU   4
+R5       EQU   5
+R6       EQU   6
+R7       EQU   7
+R8       EQU   8
+R9       EQU   9
+R10      EQU   10
+R11      EQU   11
+R12      EQU   12
+R13      EQU   13
+R14      EQU   14
+R15      EQU   15
+*
+***********************************************************************
+*        DSECTS AND MAPPING MACROES                                   *
+***********************************************************************
+*
+WORKAREA DSECT
+SAVEAREA DS    9D                      STANDARD REGISTER SAVEAREA
+DBLWORD  DS    D                       DOUBLE WORD FOR CONVERT-PRINT
+RECSXMIT DS    XL8                     RECORDS TRANSMITTED (PRINTABLE)
+MSGAREA  DS    0F,CL128                MSG CREATION AREA (ON FULLWORD!)
+WORKLEN  EQU   *-WORKAREA
+*
+***********************************************************************
+*        LOCAL MAPPING FOR INMZX02 ENTRY PARAMETER LIST               *
+***********************************************************************
+*
+PL@LIST  DSECT                         ENTRY PARAMETER LIST
+PLUSERWD DS    A                       ADDR OF A USER WORD
+PLXMKWDP DS    A                       ADDR OF KEYWORD PARM('STRING')
+PLACTFLG DS    A                       ADDR OF 1 BYTE ACTION FLAGS
+PLTSCPPL DS    A                       ADDR OF TSO CMD PROCSR PARM LIST
+PLXMEMSG DS    A                       ADDR OF ERR MSG XMIT TO ISSUE
+PLSTAFLG DS    A                       ADDR OF 1 BYTE STATUS FLAGS
+PLNOTJES EQU   X'80'                     OUTPUT NOT JES (IS DSN OR DD)
+PLFUTXTU DS    A                       ADDR OF FROM-USER TEXT UNITS
+PLFDTXTU DS    A                       ADDR OF FROM-DATASET TEXT UNITS
+PLTULIST DS    A                       ADDR OF TO-USER DATA CHAIN
+PLNUMREC DS    A                       ADDR OF WORD, NUM RECORDS XMITED
+PLXMITRC DS    A                       ADDR OF WORD, TRANSMIT CMD RETCD
+*
+***********************************************************************
+*        LOCAL MAPPING FOR ADDRESS LIST DATA CHAIN OF TO-USERS        *
+***********************************************************************
+*
+AL@LIST  DSECT                         ADDRESS LIST CHAIN OF TO-USERS
+ALNEXT   DS    A                       ADDR OF NEXT ENTRY, OR ZERO
+ALNODEL  DS    H                       LENGTH OF TARGET NODE NAME
+ALNODE   DS    CL8                     TARGET NODE NAME
+ALUSERL  DS    H                       LENGTH OF TARGET USERID
+ALUSER   DS    CL8                     TARGET USERID
+ALNICKL  DS    H                       LENGTH OF NICKNAME, OR ZERO
+ALNICK   DS    CL8                     NICKNAME OF USERID
+ALNAMEL  DS    H                       LENGTH OF NAME TAG, OR ZERO
+ALNAME   DS    CL30                    NAME TAG OF USERID
+ALFLAG   DS    X                       FLAG BYTE
+ALNOTIFY EQU   X'80'                     REQUEST NOTIFY FOR THIS USERID
+ALXMITOK EQU   X'20'                     XMIT SUCCESFULLY COMPLETED
+         DS    X                       (RESERVED)
+ALPARML  DS    H                       LENGTH OF PARM TAG, OR ZERO
+ALPARM   DS    CL30                    PARM TAG OF USERID
+*
+         END
+./ ADD NAME=TMAILQRY 0123-93096-93130-1034-00330-00104-00000-$A1238
+TMAILQRY TITLE 'TSO MAIL QUERY COMMAND'
+*---------------------------------------------------------------------*
+* MODULE NAME: TMAILQRY                                               *
+*---------------------------------------------------------------------*
+* FUNCTION   : THIS IS A TSO COMMAND THAT WILL BE USED                *
+*              TO TEST FOR MAIL TO BE RECEIVED FOR THE USER           *
+*                                                                     *
+*        THIS IS ACCOMPLISHED BY USING THE SUBSYSTEM REQUEST          *
+*        TO GET INFORMATION ON THE FIRST SYSOUT DATA SET IN THE       *
+*        PUNCH SYSOUT CLASS WITH AN EXTERNAL WRITER NAME OF           *
+*        THE CURRENT TSO SESSION (JOB NAME FROM TIOT).                *
+*                                                                     *
+*        RETURN CODES:  0  - MAIL WAITING TO BE RECEIVED              *
+*                       >0 - NO MAIL TO RECEIVE                       *
+*---------------------------------------------------------------------*
+* SYNTAX:  TMAILQRY                                                   *
+*       OR                                                            *
+*          TMAILQRY USERID                                            *
+*---------------------------------------------------------------------*
+*  LKED ATTRIBUTES:  AUTHORIZED,  RENT, REUS                          *
+*                                                                     *
+*  UPDATE SYS1.PARMLIB MEMBER IKJTSO?? TO ADD THIS AS AN AUTHORIZED   *
+*   TSO COMMAND.                                                      *
+*                                                                     *
+*  IF USING ACF2 COMMAND LIMITING THEN ALSO ADD THIS COMMAND TO THAT  *
+*     TABLE.                                                          *
+*---------------------------------------------------------------------*
+*  THIS MODULE WAS CODED BY LIONEL B. DYCK                            *
+*                           ROCKWELL INTERNATIONAL                    *
+*                           M/C  110-SE28                             *
+*                           P.O. BOX 2515                             *
+*                           SEAL BEACH, CAL 90740                     *
+*                           (310) 797-1125                            *
+*                           IBMMAIL:  USROKNTN                        *
+*                           INTERNET:  LDYCK@OSREQ48.ROCKWELL.COM     *
+*                                                                     *
+*---------------------------------------------------------------------*
+         EJECT
+*---------------------------------------------------------------------*
+*        LOCAL MACROS                                                 *
+*---------------------------------------------------------------------*
+         PRINT OFF
+         MACRO
+&LABEL   $PROLOG &LV=0,&GM=Y
+.**********************************************************************
+.*
+.*       THIS MACRO WILL PROVIDE ENTRY LINKAGE AND OPTIONALLY
+.*       MULTIPLE BASE REGISTERS.  ALSO, VIA THE 'LV=' KEYWORD
+.*       PROVIDE ADDITIONAL USER STORAGE (APPENDED TO THE
+.*       SAVE AREA) ADDRESSABLE FROM REG 13.  IF NO OPERANDS
+.*       ARE CODED, REG 12 IS ASSUMED THE BASE. EXAMPLE:
+.*              SECTNAME $PROLOG          = STANDARD REG 12 BASE
+.*              SECTNAME $PROLOG 5        = STANDARD, REG 5 BASE
+.*              SECTNAME $PROLOG 10,LV=20 = ADD 20 BYTES TO SAVE AREA
+.*                                             REG 10 IS BASE
+.*              SECTNAME $PROLOG R10,R11  = REGS 10 AND 11 ARE BASES
+.*
+.**********************************************************************
+         LCLA  &AA,&AB,&AC
+         GBLB  &PRORG
+         GBLC  &PROGM
+&AC      SETA  4096
+&LABEL   CSECT
+         B     32(R15)             BRANCH AROUND
+         DC    AL1(26)
+         DC    CL8'&LABEL'         CSECT NAME
+         DC    C'-'
+         DC    CL8'&SYSDATE'       COMPILE DATE
+         DC    C'-'
+         DC    CL8'&SYSTIME'       COMPILE TIME
+         CNOP  0,4                 ALIGNMENT
+         STM   R14,R12,12(R13)     SAVE REGISTERS
+         LR    R12,R15             LOAD BASE REG
+         USING &LABEL,R12          INFORM ASSEMBLER
+         AIF   (&LV GT 4023).MERR
+         AIF   ('&GM' EQ 'N').NOGM
+&PROGM   SETC  'GETMAIN'
+         LA    R0,&LV+72           LOAD REG 0 WITH LENGTH VARIABLE
+         GETMAIN R,LV=(0)          GET CORE FOR SAVEAREA AND USER
+         AIF   (&LV+72 LE 256).XC2
+         AIF   (&LV+72 LE 512).XC1
+         MVI   0(R1),X'00'         MOVE X'00' TO FIRST BYTE
+         LR    R2,R1               SAVE POINTER IN EVEN REG
+         LA    R4,1(R1)            SET RECEIVING POINTER
+         LR    R5,R0               SET RECEIVING LENGTH
+         BCTR  R5,R0               DECREMENT LENGTH
+         LA    R5,0(R5)            CLEAR HIGH ORDER BYTE
+         LA    R3,1                SET SENDING LENGTH
+         MVCL  R4,R2               INSTRUCTION PADS WITH X'00'
+         AGO   .STORE
+.XC1     ANOP
+         XC    256(&LV-184,R1),256(R1)  CLEAR SAVE AREA
+         XC    0(256,R1),0(R1)          CLEAR SAVE AREA
+         AGO   .STORE
+.XC2     ANOP
+         XC    0(&LV+72,R1),0(R1)       CLEAR SAVE AREA
+         AGO   .STORE
+.NOGM    ANOP
+         CNOP  0,4
+         LA    R1,SAVE&SYSNDX
+         B     *+76
+SAVE&SYSNDX DC 18F'0'
+.STORE   ANOP
+         ST    R13,4(R1)           SAVE BACK CHAIN
+         ST    R1,8(R13)           SET FORWARD CHAIN
+         LR    R11,R1              SAVE NEW SAVEAREA ADDRESS
+         L     R15,16(R13)         RESTORE REG 15
+         ST    R0,16(R13)          SAVE SAVEAREA LENGTH
+         LM    R0,R1,20(R13)       RESTORE REGS USED IN GETMAIN
+         LR    R13,R11             SET SAVEAREA POINTER
+         AIF   (N'&SYSLIST EQ 0).MEND
+         AIF   ('&SYSLIST(1)' EQ 'R12').SKIPIT
+         AIF   ('&SYSLIST(1)' EQ '12').SKIPIT
+         LA    &SYSLIST(1),&LABEL  LOAD REQUESTED BASE REG
+         DROP  R12                 DROP ASSUMED BASE REG
+         USING &LABEL,&SYSLIST(1)  INFORM ASSEMBLER
+.SKIPIT  ANOP
+&AA      SETA  2
+.LOOP    ANOP
+         AIF   (&AA GT N'&SYSLIST).MEXIT
+&AB      SETA  &AA-1
+         LA    &SYSLIST(&AA),2048(&SYSLIST(&AB))  LOAD NEXT BASE REG
+         LA    &SYSLIST(&AA),2048(&SYSLIST(&AA))  LOAD NEXT BASE REG
+         USING &LABEL+&AC,&SYSLIST(&AA) INFORM ASSEMBLER
+&AC      SETA  &AC+4096
+&AA      SETA  &AA+1
+         AGO   .LOOP
+.MEXIT   ANOP
+         AIF   (&PRORG).MEX2
+         SPACE
+         $REGS
+         SPACE
+.MEX2    ANOP
+&AA      SETA  &LV+72
+         MNOTE *,'TOTAL STORAGE AREA RECEIVED = &AA'
+         MEXIT
+.MEND    ANOP
+         MNOTE *,'NO REGISTER SPECIFIED - R12 ASSUMED'
+         AGO   .MEXIT
+.MERR    ANOP
+         MNOTE 12,'LV > 4023 - REQUEST IGNORED'
+         AGO   .MEXIT
+         MEND
+         MACRO
+&LABEL   $EPILOG &RC
+         GBLC  &PROGM
+&LABEL   LR    R1,R13              GET SAVEAREA ADDRESS
+         L     R13,4(R13)          GET BACK CHAIN POINTER
+         AIF   ('&PROGM' NE 'GETMAIN').NOFREE
+         L     R0,16(R13)          GET SAVEAREA LENGTH
+         ST    R15,16(R13)         SAVE REGISTER 15 (RETCODE)
+         FREEMAIN R,LV=(0),A=(1)   FREE SAVEAREA
+         AGO   .LM
+.NOFREE  ANOP
+         ST    R15,16(R13)         SAVE REGISTER 15 (RETCODE)
+.LM      ANOP
+         LM    R14,R12,12(R13)     RESTORE CALLERS REGS
+         AIF   (T'&RC EQ 'O').SPEC
+         LA    R15,&RC             SET RETURN CODE
+.SPEC    ANOP
+         BR    R14                 RETURN TO CALLER
+         MEND
+         MACRO
+         $REGS
+         GBLB  &PRORG
+         AIF   (&PRORG).MEX2
+&PRORG   SETB  1
+ SPACE
+R0       EQU   0
+R1       EQU   1
+R2       EQU   2
+R3       EQU   3
+R4       EQU   4
+R5       EQU   5
+R6       EQU   6
+R7       EQU   7
+R8       EQU   8
+R9       EQU   9
+R10      EQU   10
+R11      EQU   11
+R12      EQU   12
+R13      EQU   13
+R14      EQU   14
+R15      EQU   15
+ SPACE
+REG0     EQU   0
+REG1     EQU   1
+REG2     EQU   2
+REG3     EQU   3
+REG4     EQU   4
+REG5     EQU   5
+REG6     EQU   6
+REG7     EQU   7
+REG8     EQU   8
+REG9     EQU   9
+REG10    EQU   10
+REG11    EQU   11
+REG12    EQU   12
+REG13    EQU   13
+REG14    EQU   14
+REG15    EQU   15
+ SPACE
+.MEX2    ANOP
+         MEND
+         PRINT ON
+         EJECT
+TMAILQRY $PROLOG 12,LV=1000
+         USING WORK,R13
+         EJECT
+*---------------------------------------------------------------------*
+*        GET USERID TO TEST FROM PARM OR TIOT                         *
+*---------------------------------------------------------------------*
+         L     R1,0(R1)
+         LH    R2,2(R1)          LOAD OFFSET
+         LH    R3,0(R1)          LOAD LEN
+         SR    R3,R2
+         SH    R3,=H'04'         LESS HEADER
+         LTR   R3,R3             ANY LENGTH ?              *LBD 04/93*
+         BZ    DOTIOT            ZERO SO GET FROM TIOT     *LBD 04/93*
+         CH    R3,=H'07'         ELSE CHECK LENGTH
+         BH    DOTIOT            TOO LONG - IGNORE
+         AR    R1,R2             -> PARM
+         LA    R1,4(R1)          SKIP CMD HEADER
+         CLI   0(R1),C' '        CHECK FOR VALID PARM
+         BE    DOTIOT            NO PARM REALLY
+         SH    R3,=H'01'         LESS 1 FOR MVC
+         EX    R3,MVCMD
+         OC    CMDPARM,=CL8' '   INSURE UPPER CASE
+         LA    R5,CMDPARM        -> SET POINTER FOR USERID
+         B     SETSSOB
+MVCMD    MVC   CMDPARM(0),0(R1)
+DOTIOT   DS    0H
+         L     R5,16             -> CVT
+         L     R5,0(,R5)         -> TCB WORDS
+         L     R5,0(,R5)         -> MY TCB
+         L     R5,12(,R5)        -> MY TIOT
+         LA    R5,0(,R5)         -> MY JOBNAME
+         SPACE 2
+*---------------------------------------------------------------------*
+*        SET UP SSOB FOR SPOOL ACCESS                                 *
+*---------------------------------------------------------------------*
+         SPACE
+SETSSOB  DS    0H
+         LA    R4,XSSOB           GET SSOB EXTENSION ADDR
+         ST    R4,SSOBPARM           SAVE IT IN SSOB
+         OI    SSOBPARM,X'80'          AND SET FLAG
+         XC    XSSOB,XSSOB           AND ZERO WORK AREA
+         LA    R4,XSSOB
+         USING SSOB,R4
+         MVC   SSOBID,=C'SSOB'     INITIALIZE SSOB
+         MVC   SSOBLEN,=AL2(SSOBHSIZ)
+         MVC   SSOBFUNC,=AL2(SSOBSOUT)
+         MVC   SSSOLEN,=AL2(SSSOSIZE)
+         OI    SSSOFLG1,SSSOSPGM   SET WTR NAME SELECTION FLAG
+         MVC   SSSOPGMN,0(R5)      SET JOBNAME INTO SSOB
+         LA    R1,SSOBGN
+         ST    R1,SSOBINDV
+         MVC   SSSOCLSL,CLASS      SET CLASS FOR MAIL
+         EJECT
+*---------------------------------------------------------------------*
+*        ISSUE SUB SYSTEM REQUEST FOR FIRST SPOOL DATA-SET            *
+*---------------------------------------------------------------------*
+         MODESET MODE=SUP,KEY=ZERO
+         XC    SSSOFLG2,SSSOFLG2
+         XC    SSSODSN,SSSODSN
+         XC    SSSOUFLG,SSSOUFLG
+         LA    R1,SSOBPARM
+         IEFSSREQ
+         LR    R2,R15              SAVE RTN CODE
+         MODESET MODE=PROB,KEY=NZERO
+         LTR   R2,R2
+         BNZ   EXIT8
+CKRTN    CLC   SSOBRETN,=AL4(SSSORTOK)
+         BE    EXIT0
+         CLC   SSOBRETN,=AL4(SSSOEODS)
+         BE    EXIT4
+         CLC   SSOBRETN,=AL4(SSSOUNAV)
+         BE    EXIT16
+         CLC   SSOBRETN,=AL4(SSSODUPJ) DUPLICATE JOB #
+         BE    EXIT0               GET JOB ID FROM SSIB
+         B     EXIT12
+EXIT0    EQU   *
+         LA    R2,0
+         B     EXIT
+EXIT4    EQU   *
+         LA    R2,4
+         B     EXIT
+EXIT8    EQU   *
+         LA    R2,8
+         B     EXIT
+EXIT12   EQU   *
+         LA    R2,12
+         B     EXIT
+EXIT16   EQU   *
+         LA    R2,16
+EXIT     DS    0H
+         OI    SSSOFLG2,SSSOCTRL
+         MODESET MODE=SUP,KEY=ZERO
+         LA    R1,SSOBPARM
+         IEFSSREQ
+         MODESET MODE=PROB,KEY=NZERO
+         LR    R15,R2            SET RETURN CODE
+         $EPILOG ,
+         EJECT
+*---------------------------------------------------------------------*
+*        DATA AREAS                                                   *
+*---------------------------------------------------------------------*
+         LTORG
+         SPACE 2
+CLASS    DC    CL8'B '             PUNCH SYSOUT CLASS FOR MAIL
+         SPACE 2
+         EJECT
+*---------------------------------------------------------------------*
+*        MAPPING MACROS                                               *
+*---------------------------------------------------------------------*
+WORK     DSECT
+         DS    18F
+SSOBPARM DS    F
+         DS    0D
+XSSOB    DS    140X
+CMDPARM  DS    CL8
+         TITLE 'SSOB'
+         IEFJSSOB SO
+         TITLE 'SSIB'
+         IEFJSSIB
+         TITLE 'JES CT'
+         IEFJESCT
+         TITLE 'CVT'
+         CVT   DSECT=YES,LIST=YES
+         END

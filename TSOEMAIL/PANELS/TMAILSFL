@@ -1,0 +1,61 @@
+)ATTR DEFAULT(%+_)
+       %   TYPE(TEXT) INTENS(HIGH)
+       +   TYPE(TEXT) INTENS(LOW)
+       _   TYPE(INPUT) INTENS(HIGH) CAPS(ON) JUST(LEFT)
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+   ¦ type(text) intens(high) caps(off) just(asis ) color(turq)
+)BODY
++---------------------% TSO/E-Mail Send File Processing +-----------------------
+%Command ===>_zcmd
++
++
++Send a Data Set to a TSO or VM user
++
++
++To:       Nickname %===>_Z       +(Nickname or Distribution List)%*+
++
++or        Center   %===>_Z       +(NJE Node Name)
++          Userid   %===>_Z       +(Userid)
++
++
++   Data Set Name   %===>_Z
++      Sequential   %===>_Z+        Specify%Y+if the above data set is a PDS
++                                   member and you want it sent sequentially
++
++
++
++
+%*+See TSO HELP on NICKNAMES. Requires 'userid.NAMES.TEXT' file.
+)INIT
+  .ZVARS = '(SENDNAME SENDNODE SENDUID SENDDSN SENDSEQ)'
+  .CURSOR = SENDNAME
+  IF (&SENDNODE = &Z) &SENDNODE = &SENDCTR
+  &SENDSEQ = N
+)PROC
+  IF (&SENDDSN NE &Z)
+     &FILE = 'DS(&SENDDSN)'
+  IF (&SENDSEQ = Y)
+        &SQ = SEQ
+  IF (&SENDSEQ = N)
+        &SQ = &Z
+  IF (&SENDDSN = &Z)
+     &SQ = &Z
+  IF (&SENDNAME  = &Z)
+    VER (&SENDUID,NONBLANK)
+    VER (&SENDNODE,NB,NAME)
+    VER (&SENDDSN,NB,DSNAME)
+    VER (&SENDSEQ,LIST,Y,N)
+    &ZSEL = 'CMD(%TMAILSND &SENDNODE..&SENDUID &FILE NOMSG &SQ)'
+  IF (&SENDNAME NE &Z)
+    IF (&SENDUID  NE &Z)  &SENDERR = YES
+         IF (&SENDNODE NE &Z)  &SENDERR = YES
+    IF (&SENDERR = YES)
+     &SENDERR = &Z
+     &mailsmsg = 'Send to who? '
+     &maillmsg= 'Can''t specify both Nickname &SENDNAME and &SENDNODE..&SENDUID'
+      .MSG = MAIL000
+    VER (&SENDNAME,NONBLANK)
+    VER (&SENDDSN,NB,DSNAME)
+    VER (&SENDSEQ,LIST,Y,N)
+    &ZSEL = 'CMD(%TMAILSND &SENDNAME &FILE NOMSG &SQ SENDFILE)'
+)END

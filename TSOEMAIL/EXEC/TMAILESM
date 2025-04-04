@@ -1,0 +1,83 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TMAILESM                                           *
+         *                                                               *
+         * Function:  Update the message to be transmitted to            *
+         *            an SMTP (aka SMTPID) address.                      *
+         *                                                               *
+         * Syntax:    ISPEXEC EDIT DATASET(...) MACRO(TMAILESM)          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * History:                                                      *
+         *            11/17/97 - set replyto to sendid if null           *
+         *            02/06/96 - Add replyto field and change author adr *
+         *            02/14/92 - Created                                 *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        Address ISREDIT  "MACRO"
+
+        /* ------------------------------------------------------------- *
+         * Extract mailling information                                  *
+         * ------------------------------------------------------------- */
+        Address ISPEXEC "VGET (SMTPID SMTPHOST TMEVER) SHARED"
+        Address ISPEXEC "VGET (REPLYTO) PROFILE"
+
+        sendid = sysvar(sysuid)"@"smtphost
+
+        Address ISREDIT
+
+        "FIND 'rcpt to:' FIRST"
+        if rc > 0 then option = "FIRST"
+                  else do
+                       option = "NEXT"
+                       "(CLINE) = CURSOR"
+                       cline = cline + 1
+                       "CURSOR =" cline
+                       end
+        "FIND 'To:'" option
+        "(CLINE) = CURSOR"
+        "LINE" cline "= 'To:     " smtpid "'"
+        "FIND 'Sender: ' FIRST"
+        "(CLINE) = CURSOR"
+        "LINE" cline "= 'Sender: " sendid "'"
+
+        "Find 'rcpt to:' FIRST"
+         if rc = 0 then do
+           "(LINE) = CURSOR"
+           "Line" line "= 'rcpt to:   <"smtpid">'"
+           end
+
+        "Find 'helo ' FIRST 1"
+        if rc <> 0 then do
+           "Line_Before .ZF = 'helo "smtphost "'"
+           "Line_After  .ZF = 'mail from: <"sendid">'"
+           line_num = 2
+           "Line_After" line_num "= 'rcpt to:   <"smtpid">'"
+           line_num = 3
+           "Line_After" line_num "= 'data'"
+
+           "Find 'From:'"
+            if rc = 0 then do
+              "(LINE) = CURSOR"
+              "(DATA) = LINE" line
+              parse value data with from "<" .
+              from = strip(from)
+              "Line" line "= '"from "<"sendid">'"
+              end
+
+              if replyto = '' then replyto = sendid
+
+              "Line_after" line "= 'Reply-To: "replyto"'"
+              "Line_after" line+1 "= 'X-Mailer:",
+                    "TSO/E-Mail Version "tmever"'"
+           end
+
+        "SAVE"
+        "END"
+        exit 0

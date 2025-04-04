@@ -1,0 +1,77 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      name                                               *
+         *                                                               *
+         * Function:  Create list of all books on a set of .BKSHELF      *
+         *            the list of shelves if found in member NEWSHELF    *
+         *            of the build softcopy table data set.              *
+         *                                                               *
+         * Syntax:    %softpbkl                                          *
+         *                                                               *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Rockwell International                             *
+         *            P.O. Box 2515                                      *
+         *            Seal Beach, California 90740                       *
+         *            (310) 797-1125                                     *
+         *            IBMMail:  USROKNTN                                 *
+         *            Internet: lbdyck@osreq48.rockwell.com              *
+         *            IBMLINK:  ROK2027                                  *
+         *                                                               *
+         * History:                                                      *
+         *            12/15/93 - fix for change to newshelf format       *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        "%Softpdft"
+        Address ISPEXEC "Vget build"
+
+        parse value build with "'" dsn "'"
+        newshelf = "'"dsn"(NEWSHELF)'"
+        newbooks = "'"dsn"(NEWBOOKS)'"
+
+        dd = "bkl"random()
+
+        "Alloc f("dd") shr reuse dsn("newshelf")"
+        "Execio * diskr" dd "(Finis stem bkl."
+        "Free  f("dd")"
+
+        books.  = ""
+        books.0 = 0
+
+        do bkl = 1 to bkl.0
+           parse value bkl.bkl with s dsn .
+           drop bks.
+           "Alloc f("dd") shr reuse dsn('"dsn"')"
+           "Execio * diskr" dd "(finis stem bks."
+           "Free  f("dd")"
+           call get_books
+           end
+
+        "Alloc f("dd") shr reuse dsn("newbooks")"
+        "Execio * diskw" dd "(finis stem books."
+        "Free  f("dd")"
+        exit 0
+
+        Get_Books:
+        parse value "" with bknum bkname bkdate
+        do bks = 1 to bks.0
+           Select
+             When left(bks.bks,2) = "SH" then
+                  bknum = substr(bks.bks,3,9)
+             When left(bks.bks,2) = "ST" then
+                  parse value bks.bks with "ST" bkname
+             When left(bks.bks,10) = "BKDATETIME" then
+                  parse value bks.bks with "BKDATETIME=" bkdate .
+             Otherwise nop;
+             end
+
+           if bknum  = "" then iterate
+           if bkname = "" then iterate
+           if bkdate = "" then iterate
+
+           x = books.0 + 1
+           books.0 = x
+           books.x = bknum substr(bkname,1,60) bkdate
+           parse value "" with bknum bkname bkdate
+           end
+        Return

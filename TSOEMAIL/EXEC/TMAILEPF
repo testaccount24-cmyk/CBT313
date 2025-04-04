@@ -1,0 +1,124 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TMAILEPF                                           *
+         *                                                               *
+         * Function:  Update the message to be transmitted to            *
+         *            a non-TSO user with valid PROFS header and         *
+         *            trailer information                                *
+         *                                                               *
+         * Syntax:    ISPEXEC EDIT DATASET(...) MACRO(TMAILEPF)          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * Change History:                                               *
+         *            07/02/99 - fix date to y2k                         *
+         *            11/16/93 - Minor fix and cleanup                   *
+         *            08/25/92 - Set for NONUM                           *
+         *            05/07/92 - Set bounds for shift                    *
+         *            04/16/92 - Fixup code for smtp to remove for profs *
+         *            02/28/92 - Remove smtp address from From:          *
+         *            02/14/92 - Remove SMTP headers if present          *
+         *            11/05/91 - Shift everything right 1 column for     *
+         *                       standardization with IBM Mail Exchange  *
+         *                       'standards'.                            *
+         *            09/30/91 - Correction to support quotes in the sub *
+         *            08/29/90 - Creation of this REXX Procedure         *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        Address ISREDIT  "MACRO"
+
+        /* ------------------------------------------------------------- *
+         * Extract mailling information                                  *
+         * ------------------------------------------------------------- */
+        Address ISPEXEC "VGET (SENDID SENDSUBJ SENDCTR TONODE ",
+                         "TOID ACK) SHARED"
+
+        sender = sysvar(sysuid)
+
+        Address ISREDIT
+
+        "(LINE) = LINE 1"
+        "Number Off"
+
+        /* ------------------------------------------------------------- *
+         * Determine if SMTP headers exist and remove them               *
+         * ------------------------------------------------------------- */
+         "FIND 'helo' 1 FIRST"
+         if rc = 0 then do
+            "DELETE 1 4"
+            "Find 'To:' 1 "
+            if rc = 0 then do
+              "(LINE) = CURSOR"
+              "(DATA) = LINE" line
+              parse value data with from "<" .
+              to = strip(to)
+              "Line" line "= 'To:      "sendid "'"
+              end
+             "Find 'Sender:' 1"
+              if rc = 0 then do
+                 "(LINE) = CURSOR"
+                 "Delete" Line
+                 end
+            "Find 'From:' 1"
+            if rc = 0 then do
+              "(LINE) = CURSOR"
+              "(DATA) = LINE" line
+              parse value data with from "<" .
+              from = strip(from)
+              "Line" line "= '"from "'"
+              end
+          end
+
+        /* ------------------------------------------------------------- *
+         * Determine if this is the first time, otherwise delete the     *
+         * previously inserted PROFS header and trailer                  *
+         * ------------------------------------------------------------- */
+        if substr(line,2,10) = "MSG:FROM: " then do
+             "DELETE .zfirst"
+             "DELETE .zlast"
+             end
+             else call shift_right
+
+        "(LAST) = LINENUM .ZLAST"
+
+        /* ------------------------------------------------------------- *
+         * Fix up the PROFS Header record                                *
+         * ------------------------------------------------------------- */
+        "LINE_BEFORE 1 = ' MSG:FROM:" left(sender,8)"--"left(sendctr,8) "TO:",
+            left(toid,8)"--"left(tonode,18)date() time()"'"
+
+        "CHANGE ' ' x'FE' 1 FIRST"
+        if ack = "Y"
+           then "CHANGE ' ' x'01' 80 FIRST"
+
+        /* ------------------------------------------------------------- *
+         * Fix up the PROFS Trailer record                               *
+         * ------------------------------------------------------------- */
+        subject = left(" ",6)left(sendsubj,65)
+        "LINE_AFTER" last+1 " = (subject)"
+
+        "CHANGE '      ' x'FFFF00000011' 1 LAST"
+        "CHANGE '         ' x'000000000000000000' 72 LAST"
+
+        "SAVE"
+        "END"
+        exit 0
+
+        Shift_right:
+        /* only do a shift right 1 column if sending
+           to node IBMMAIL */
+        if wordpos(tonode,"IBMMAIL") = 0 then return
+            "(LAST) = LINENUM .ZLAST"
+            "(BNDL,BNDR) = BOUNDS"
+            "(LRECL) = LRECL"
+               "BOUNDS = 1" lrecl
+            do i = 1 to last
+               "SHIFT )" i "1"
+               end
+               "BOUNDS =" bndl bndr
+        return

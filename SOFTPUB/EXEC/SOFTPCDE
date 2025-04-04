@@ -1,0 +1,37 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      softpcde                                           *
+         *                                                               *
+         * Function:  Edit macro called by SOFTPCDR to fixup a bkshelf   *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *            IBMLINK:  SYSLBD                                   *
+         *                                                               *
+         * History:                                                      *
+         *            04/30/98 - creation                                *
+         *                                                               *
+         * ------------------------------------------------------------- */
+         Address ISREDIT
+         "Macro"
+
+         Address ISPExec "Vget (inhlq outhlq)"
+
+         "Caps off"
+         "Number off"
+         "Change 'bkstitle' 'BKSTITLE' all"
+         "Find 'BKSTITLE=' First"
+         "(LINE) = CURSOR"
+         "(DATA) = LINE" line
+         parse value data with "BKSTITLE=" title
+
+         "Change" inhlq outhlq "all"
+
+         title = strip(title)
+
+         Address ISPExec "Vput (title) shared"
+         "Save"
+         "End"

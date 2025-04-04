@@ -1,0 +1,51 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ` type(text)   intens(low ) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+)BODY
++-------------------------% TSO/E-Mail File Forward +---------------------------
+%Command ===>_zcmd
++
+`Forward file to user specified below:
++
++
+`To:       Nickname %===>_FFNICK  `(Nickname or Distribution List)%*+
++
+`or        Center   %===>_FFNODE  `(NJE Node Name)
+`          Userid   %===>_FFUSER  `(Userid)
++
+`Log Transmission   %===>_Z  `    `(Yes or No)
+`Acknowledgement    %===>_Z  `    `(Yes or No)
++
++
++File to be forwarded:¬mailtds
++       received from:¬fid
++                  on:¬maildatd ¬mailtime
++
++Press 'ENTER' to send the file or 'PF3' to cancel
+)INIT
+  .ZVARS = 'TMAILLOG TMAILACK'
+  &TMAILLOG = TRANS(&TMAILLOG Y,Yes N,No &Z,Yes )
+  &TMAILACK = TRANS(&TMAILACK Y,Yes N,No &Z,Yes )
+ if (&mailgloc NE &z)
+   &fid  = '&mailfid at &mailfloc'
+ if (&mailfloc = &z)
+    &fid  = &mailfid
+)PROC
+   &TMAILLOG = TRUNC(&TMAILLOG,1)
+   &TMAILACK = TRUNC(&TMAILACK,1)
+    VER (&TMAILLOG,NB,LIST,Y,N,YES,NO)
+    VER (&TMAILACK,NB,LIST,Y,N,YES,NO)
+   &FFLLOG = &Z
+   &FFLACK = &Z
+   IF (&TMAILLOG = Y)
+      &FFLLOG = MLOG
+   IF (&TMAILACK = Y)
+      &FFLACK = MACK
+)END

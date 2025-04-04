@@ -1,0 +1,8 @@
+        /*  Rexx EXEC for the TSO Mail Menu */
+
+        arg option
+
+        if length(option) = 0 then
+           Address ISPEXEC "SELECT PANEL(TMAILMNU) NEWAPPL(MAIL)"
+           else
+           Address ISPEXEC "SELECT PANEL(TMAILMNU) OPT("option") NEWAPPL(MAIL)"

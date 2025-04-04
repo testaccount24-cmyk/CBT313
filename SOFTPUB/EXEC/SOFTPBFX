@@ -1,0 +1,74 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPBFX                                           *
+         *                                                               *
+         * Function:  Called by the update shelf routine when it is      *
+         *            necessary to update a new BKSHELF with the         *
+         *            correct dsnames and then rename the BKSHELF to     *
+         *            remove the 2nd qualifier of UPLOAD.                *
+         *                                                               *
+         * Syntax:    %SOFTPBFX dsname                                   *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Rockwell International                             *
+         *            P.O. Box 2515                                      *
+         *            Seal Beach, California 90740                       *
+         *            (310) 797-1125                                     *
+         *            IBMMail:  USROKNTN                                 *
+         *            Internet: lbdyck@osreq48.rockwell.com              *
+         *            IBMLINK:  ROK2027                                  *
+         *                                                               *
+         * History:                                                      *
+         *            07/14/93 - created from SOFTPBRP                   *
+         * ------------------------------------------------------------- */
+
+        arg dsn
+
+        ddn        = "BK"random()
+
+        "%SOFTPDFT"
+        Address ISPEXEC "VGET (INDEX)"
+
+        dsname = strip(dsn)
+        if left(dsname,1) = "'" then
+           parse value dsname with "'" dsname "'"
+        "Alloc f("ddn") Shr Reuse Ds('"dsname"')"
+        "Execio * Diskr" ddn "(Finis Stem Book."
+        "Free  f("ddn")"
+        say 'Processing dsname:' dsname
+
+        book_out.  = ""
+        book_out.0 = 0
+        do j = 1 to book.0
+          if left(book.j,9) = "BKSTITLE=" then
+             parse value book.j with "BKSTITLE=" title
+          if left(book.j,7) = "BKNAME=" then do
+             bc         = book_out.0 + 1
+             book_out.0 = bc
+             parse value book.j with "BKNAME=" name .
+             book_out.bc = "BKMDSN="index"."name".BOOK"
+             end
+          if left(book.j,9) = "BKSINDEX=" then do
+             parse value book.j with "BKSINDEX=" name .
+             if name = null then
+                parse value dsname with index".UPLOAD." name ".BKSHELF" .
+             bc         = book_out.0 + 1
+             book_out.0 = bc
+             book_out.bc = "BKSIMDSN="index"."name".BKINDEX"
+             end
+          bc         = book_out.0 + 1
+          book_out.0 = bc
+          book_out.bc = book.j
+          end
+        say "Updateing" dsname "for correct book names."
+        "Alloc f("ddn") Shr Reuse Ds('"dsname"')"
+        "Execio * Diskw" ddn "(Finis Stem Book_Out."
+        "Free  f("ddn")"
+        old_dsn = dsname
+        parse value dsname with index".UPLOAD." bksname ".BKSHELF" .
+        dsname = index"."bksname".BKSHELF"
+        if sysdsn("'"dsname"'") = "OK" then do
+           say "Doing delete for old" dsname
+           "DELETE '"dsname"'"
+           end
+        say "Doing rename of" old_dsn "to" dsname
+        "Rename '"old_dsn"' '"dsname"'"

@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++-------------------------% TSO/E-Mail LOG Tutorial +---------------------------
+%Command ===>_zcmd
+%
+`      The following commands may be entered on the ISPF Command line when
+`      in the TSO/E-Mail LOG Table display.
+
+¦      Action Command Options:
+
+¦     ¬NEW                   `Create a new TSO/E-Mail LOG table and data set.
+¦     ¬RENumber              `Renumber the log entries in the table.
+
+¦      Log selection options:
+
+¦     ¬S`                    `Read the selected LOG
+¦     ¬C                     `Change information about the selected LOG
+¦     ¬D                     `Delete the selected LOG
+¦     ¬I                     `Display information about the selected LOG
+
+)Init
+)Proc
+)End

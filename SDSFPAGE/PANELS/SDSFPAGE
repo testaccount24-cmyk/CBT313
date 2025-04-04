@@ -1,0 +1,32 @@
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on) just(left )
+   ` type( input) intens(high) caps(off) just(left )
+   % type(text) intens(high)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+)Body Expand(\\)
+%-\-\- $cmd ~Page Menu &ver %-\-\-
++Command Input%===>_zcmd
++
++Select Page Print Option:
++
+   % 1 (B)+- Browse the Data Set
+   % 2 (P)+- Print to Sysout
+   % 3 (C)+- Copy to Data Set
+   % 4 (M)+- Mail Data Set (via XMITIP) %Format:`fmt+(html,pdf,rtf,txt)
+   % 5 (E)+- Edit Data Set
+   % 6 (T)+- Transfer to a PC
+
+)Init
+ .cursor = zcmd
+ IF (&fmt EQ &Z)
+    &fmt = txt
+)Proc
+ ver (&zcmd,list,1,2,3,4,5,6,B,C,E,M,P,T)
+ &fmt = trans(trunc(&fmt,1) t,txt  T,txt
+                            h,html H,html
+                            p,pdf  P,pdf
+                            r,rtf  R,rtf *,*)
+ ver (&fmt,list,&z,txt,html,pdf,rtf)
+)end

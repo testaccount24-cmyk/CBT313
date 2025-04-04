@@ -1,0 +1,50 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ~ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) COLOR(yellow) hilite(uscore)
+   ` TYPE(INPUT) CAPS(ON)  INTENS(HIGH) COLOR(yellow) hilite(uscore)
+   # area(SCRL) Extend(ON)
+)Body
++----------------------% TSO/E Mail IBM Fax Information +-----------------------
+%Command ===>_zcmd
+%
+¬     Verify your IBM Fax Information:
++
+#help -------------------------------------------------------------------------#
+)Area Help
+¬     Fax Phone:      ==> ~FAXPHONE                               +
++
+¬     Subject:        ==> ~FAXSUB                                          +
++
+¬     To Information: ==> ~FAXT1                                          +
+¬                     ==> ~FAXT2                                          +
+¬                     ==> ~FAXT3                                          +
+¬                     ==> ~FAXT4                                          +
+¬                     ==> ~FAXT5                                          +
+¬                     ==> ~FAXT6                                          +
+¬                     ==> ~FAXT7                                          +
+¬                     ==> ~FAXT8                                          +
++
+¬     Your Name:      ==> ~FAXF1                                          +
+¬                     ==> ~FAXF2                                          +
+¬                     ==> ~FAXF3                                          +
+¬                     ==> ~FAXF4                                          +
+¬                     ==> ~FAXF5                                          +
+¬                     ==> ~FAXF6                                          +
+¬                     ==> ~FAXF7                                          +
+¬                     ==> ~FAXF8                                          +
++
++  You can alter all of this information in the body of your note if you
++  need to.
++
+)Init
+  .HELP = TMAILHF1
+  IF (&FAXPHONE = &Z)
+     &FAXPHONE = 'XXX XXX-XXXX'
+)Proc
+    VPUT (FAXF1 FAXF2 FAXF3 FAXF4 FAXF5 FAXF6 FAXF7 FAXF8) PROFILE
+)End

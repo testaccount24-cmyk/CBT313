@@ -1,0 +1,38 @@
+//asmit  JOB    ....
+//HOLD     OUTPUT JESDS=ALL,DEFAULT=Y,OUTDISP=(HOLD,HOLD)
+//*******************************************************************
+//*  CHANGE userid.slm.new to match your dataset names
+//*******************************************************************
+//C1     EXEC  PGM=ASMA90,PARM='OBJECT'
+//SYSLIB   DD  DSN=SYS1.MACLIB,DISP=SHR
+//         DD  DSN=SYS1.AMODGEN,DISP=SHR
+//SYSUT1   DD  UNIT=SYSDA,SPACE=(CYL,(10,5))
+//SYSPUNCH DD  DUMMY
+//SYSPRINT DD  SYSOUT=*,DCB=(BLKSIZE=3509)
+//SYSLIN   DD  DISP=(,PASS),UNIT=SYSDA,SPACE=(CYL,(5,5,0)),            *
+//             DCB=(BLKSIZE=400),DSN=&LOADSET
+//SYSIN    DD  DSN=userid.slm.new.ASM(SLMREXXF),DISP=SHR
+//*******************************************************************
+//L1   EXEC  PGM=IEWL,PARM='MAP,LET,LIST'
+//SYSLIN   DD  DSN=&LOADSET,DISP=(OLD,DELETE)
+//*     The next statement point to the target load library
+//SYSLMOD  DD  DSN=userid.slm.new.LOAD(SLMREXXF),DISP=SHR
+//SYSUT1   DD  UNIT=SYSDA,SPACE=(CYL,(3,2))
+//SYSPRINT DD  SYSOUT=*,DCB=(RECFM=FB,BLKSIZE=3509)
+//*******************************************************************
+//C2     EXEC  PGM=ASMA90,PARM='OBJECT'
+//SYSLIB   DD  DSN=SYS1.MACLIB,DISP=SHR
+//         DD  DSN=SYS1.AMODGEN,DISP=SHR
+//SYSUT1   DD  UNIT=SYSDA,SPACE=(CYL,(10,5))
+//SYSPUNCH DD  DUMMY
+//SYSPRINT DD  SYSOUT=*,DCB=(BLKSIZE=3509)
+//SYSLIN   DD  DISP=(,PASS),UNIT=SYSDA,SPACE=(CYL,(5,5,0)),            *
+//             DCB=(BLKSIZE=400),DSN=&LOADSET
+//SYSIN    DD  DSN=userid.slm.new.ASM(SLMDDQ),DISP=SHR
+//*******************************************************************
+//L2   EXEC  PGM=IEWL,PARM='MAP,LET,LIST'
+//SYSLIN   DD  DSN=&LOADSET,DISP=(OLD,DELETE)
+//*     The next statement point to the target load library
+//SYSLMOD  DD  DSN=userid.slm.new.LOAD(SLMDDQ),DISP=SHR
+//SYSUT1   DD  UNIT=SYSDA,SPACE=(CYL,(3,2))
+//SYSPRINT DD  SYSOUT=*,DCB=(RECFM=FB,BLKSIZE=3509)

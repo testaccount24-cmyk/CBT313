@@ -1,0 +1,27 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬S.6`or¬PDS`option will invoke the ISPF PDS dialog for the selected
+`      data set.  There is a very complete tutorial for this option
+`      available once in the PDS dialog.
+`
+`      The¬S.7`or¬Delete`option will allow you to delete the selected data set.
+`
+`      The¬S.8`or¬UNT`option will invoke the IBM utility to unterse data sets
+`      compressed using the TERSE utility (e.g. PTFs from IBMLink)
+`
+%      Notes:
+`     ¬S.6`may also be specified as:¬PDS
+`     ¬S.7`may also be specified as:¬DEL
+`     ¬S.8`may also be specified as:¬UNT, PTF, UNTERSE
+)End

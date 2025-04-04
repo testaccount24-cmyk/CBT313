@@ -1,0 +1,139 @@
+)Panel Keylist(Help,EOXR)
+)Attr Default(%+_)
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_') color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+   % type(text) intens(high)
+   + type(text  ) intens(low )
+     skip(on)
+   # area(SCRL) Extend(ON)
+)Body
++----------------------% Softcopy Publications Tutorial +-----------------------
+%Command ===>_zcmd
+%
++
+#help -------------------------------------------------------------------------#
+)Area Help
++ `  Tutorial for the Softcopy Publications Application
++
++    This application is a locally designed interface to IBM's BookManager
++    Read/MVS product.  It provides a more hierarchical structure for
++    accessing softcopy publications.
++
++    For more information on using the BookManager Read/MVS application
++    use HELP once you have selected a BookShelf and entered the
++    BookManager Read/MVS product.
++
++    Each row in the tables represent either a Category of softcopy
++    publications or a specific book shelf of softcopy publications.
++
++    A row is selected by one of the following methods:
++
++    1.  Move the cursor to anyplace on the row and press the ENTER key.
++
++    2.  Place any non-blank character in the selection field of the row
++        and then press the ENTER key.
++
++    A FIND can be performed on the current table to search for a specific
++    character string within the Category or Book Shelf title.  This is
++    accomplished by entering the following command on the ISPF Command
++    line:
++
++    FIND string
++
++    The word FIND can be abbreviated as F and the use of Repeat Find is
++    supported using the Repeat Find ISPF function key (&RFIND).  The
++    string must not be inclosed in quotes.  A successful find will cause
++    the cursor to be positioned on that line.  Use of Repeat Find will
++    move the cursor to the next occurance of the specified string.
++
++    For example, to find any book shelf referencing ISPF enter:
++
++                   F ISPF
++
++    Note that you can also do a find for a publication number.  For example
++    if you are looking for an IBM Publication numbered SC34-4258 you would
++    enter:
++
++                   F SC344258
++
++    The publication number does not appear in the displayed list of
++    publications but can be viewed by placing a 'V' on the row in the
++    selection field.  This is`only+valid when the display is from this
++    front end application.
++
++
++ `  Starting this application with selection options
++
++    This application can be started with the following ISPF command
++    and options from any place within ISPF:
++
++    BOOKMan options
++
++    Options that are currently supported are:
++
++ `  Find string
++
++       Find the specified string in the top level category list.
++      ~see below for a description of the string syntax
++
++ `  DFind string
++
++       Find the specified string in the list of all book shelves that also
++       includes any specific books included in a category.
++
++       The 'string' is broken into individual parts and each part is searched
++       for.  If all parts are found then the bookshelf is displayed.
++
++ `  DBfind string
++
++       Find the specified string in the list of all books.
++
++       The 'string' is broken into individual parts and each part is searched
++       for.  If all parts are found then the bookshelf is displayed.
++
++ `  Books
++
++       Start the application with the All Books list open.
++
++ `  Private
++
++       Start the application with the any private book shelves opened.
++       (these are shelves that are allocated under the users high level
++       prefix).
++
++ `   string syntax
++
++       A string consists of any characters that may appear in any
++       position within a publication title or publication number.
++       A string is entered without quotes or any other special
++       delimeter to allow those characters to be used in the search
++       string if desired.
++
++       Examples strings:
++
++       MVS/ESA
++       ~ will return all publications with MVS/ESA in their title
++
++       MVS ESA
++       ~ will return all publications with both MVS and ESA
++       ~ (with the blank in between) in their titles
++
++       GG24
++       ~ will return all publications with GG24 in their publication
++       ~ number (as you will probably not find that string in any title)
++
++ `  Publication Number information
++
++       Publication numbers are provided by the vendors with their
++       softcopy publications.  The format is xxxxxxxxss where
++       xxxxxxxx is the publication number and ss is the revision
++       code for the publication.
++
+)Init
+  .cursor = zcmd
+  &rfind = PFK(RFIND)
+)Proc
+)end

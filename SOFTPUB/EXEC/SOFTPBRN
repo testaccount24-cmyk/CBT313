@@ -1,0 +1,181 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPBRP                                           *
+         *                                                               *
+         * Function:  Create in the build table data set member REPORT   *
+         *            which lists each dsname and the book shelf title   *
+         *            for every bkshelf.                                 *
+         *                                                               *
+         *            Also update every newly uploaded BKSHELF with the  *
+         *            correct dsnames and then rename the BKSHELF to     *
+         *            remove the 2nd qualifier of UPLOAD.                *
+         *                                                               *
+         * Syntax:    %SOFTPBRP                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Foundation Health Plan                      *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, California 94598                     *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: syslbd@ncal.kaiperm.org                  *
+         *                                                               *
+         * History:                                                      *
+         *            02/13/97 - add support for non 'upload' newshelves *
+         *            12/26/95 - add collect option to look only at      *
+         *                       newly uploaded shelves                  *
+         *            05/14/93 - updated to use mvs/bdt to send new      *
+         *                       shelfs, index and books to other        *
+         *                       centers                                 *
+         * ------------------------------------------------------------- */
+
+       arg option
+       option = translate(option)
+       if option = "COLLECT" then option = 1
+
+        "%SOFTPDFT"
+        Address ISPEXEC "VGET (BUILD INDEX Centers)"
+
+        build_table = strip(build,,"'")
+        report.     = ""
+        report.0   = 0
+        ddn        = "BK"random()
+
+        x = outtrap("listc.","*")
+   /*   if option <> 1 then  */
+           "LISTC LEVEL("index")"
+   /*      else
+           "LISTC LEVEL("index".UPLOAD)"   */
+        x = outtrap("OFF")
+
+        do i = 1 to listc.0
+           if substr(listc.i,2,1) = " " then iterate
+           parse value listc.i with "NONVSAM -------" dsname
+             if pos(".BKSHELF",dsname) > 0 then call do_bkshelf
+           end
+
+        "Alloc f("ddn") ds('"build_table"(REPORT)') Shr Reuse"
+        "Execio * Diskr" ddn "(Finis Stem old."
+        "Execio * Diskw" ddn "(Finis Stem report."
+        "Free  f("ddn")"
+
+        do i = 1 to old.0
+           name = word(old.i,1)
+           oldname.name = "on"
+           end
+        new.  = ""
+        new.0 = 0
+        do i = 1 to report.0
+           name = word(report.i,1)
+           if left(name,6) = "MVS.XX" then say name /* $ */
+           if oldname.name = "on" then iterate
+           cnt     = new.0 + 1
+           new.0   = cnt
+           new.cnt = "S" report.i
+           end
+
+        if new.0 > 0 then do
+           say "New Book Shelves found.  Creating" build_table"(NEWSHELF)"
+           "Alloc f("ddn") ds('"build_table"(NEWSHELF)') Shr Reuse"
+           "Execio * Diskw" ddn "(Finis Stem new."
+           "Free  f("ddn")"
+        end
+        else say "No new Book Shelves found.",
+             build_table"(NEWSHELF) not updated."
+
+        Exit 0
+
+        do_bkshelf:
+        dsname = strip(dsname)
+        "Alloc f("ddn") Shr Reuse Ds('"dsname"')"
+        "Execio * Diskr" ddn "(Finis Stem Book."
+        "Free  f("ddn")"
+        if pos(".UPLOAD.",dsname) > 0 then call Fix_Upload
+                                      else call Get_Title
+        cnt        = report.0 + 1
+        report.0   = cnt
+        report.cnt = dsname title
+        say 'Reporting:' report.cnt
+        drop book.
+        return
+
+        Get_Title:
+        if option = 1 then return
+        say 'Processing dsname:' dsname
+        do j = 1 to book.0
+          if left(book.j,9) = "BKSTITLE=" then do
+             parse value book.j with "BKSTITLE=" title
+             return
+             end
+        end
+        return
+
+        Fix_Upload:
+        say 'Processing new dsname:' dsname
+        book_out.  = ""
+        book_out.0 = 0
+        do j = 1 to book.0
+          if left(book.j,9) = "BKSTITLE=" then
+             parse value book.j with "BKSTITLE=" title
+          if left(book.j,7) = "BKNAME=" then do
+             bc         = book_out.0 + 1
+             book_out.0 = bc
+             parse value book.j with "BKNAME=" name .
+             book_out.bc = "BKMDSN="index"."name".BOOK"
+             end
+          if left(book.j,9) = "BKSINDEX=" then do
+             parse value book.j with "BKSINDEX=" name .
+             if name = null then
+                parse value dsname with index".UPLOAD." name ".BKSHELF" .
+             bc         = book_out.0 + 1
+             book_out.0 = bc
+             book_out.bc = "BKSIMDSN="index"."name".BKINDEX"
+             end
+          bc         = book_out.0 + 1
+          book_out.0 = bc
+          book_out.bc = book.j
+          end
+        say "Updateing" dsname "for correct book names."
+        "Alloc f("ddn") Shr Reuse Ds('"dsname"')"
+        "Execio * Diskw" ddn "(Finis Stem Book_Out."
+        "Free  f("ddn")"
+        old_dsn = dsname
+        parse value dsname with index".UPLOAD." bksname ".BKSHELF" .
+        dsname = index"."bksname".BKSHELF"
+        if sysdsn("'"dsname"'") = "OK" then do
+           say "Doing delete for old" dsname
+           "DELETE '"dsname"'"
+           end
+        say "Doing rename of" old_dsn "to" dsname
+        "Rename '"old_dsn"' '"dsname"'"
+        call do_bdt "'"dsname"'"
+        return
+
+        /* ------------------------------------------------------------- *
+         * Do_BDT routine is used to issue the MVS/BDT command....       *
+         * ------------------------------------------------------------- */
+        Do_BDT: procedure expose centers
+        return  /* just for Kaiser */
+        arg filedsn
+        call listdsi filedsn 'directory'
+
+        center=showrexx("CENTER")
+
+        if sysdsorg = "PS" then dap = "SEQ"
+                           else dap = "PDS"
+           alloc = "CYLINDER TRACK BLOCK"
+           units = wordpos(sysunits,alloc)
+           units = word(alloc,units)
+           if units = "BLOCK" then units = "TRACK RLSE"
+           disp_opt = "New Recfm("sysrecfm") Lrecl("syslrecl")" ,
+                      "Blksize("sysblksize") Space("sysused","sysseconds")",
+                      "Unit(SYSTS)"
+           if dap = "PDS" then disp_opt = disp_opt "Dir("sysadirblk")"
+
+        say "Transmitting file:" filedsn "to centers:" centers
+
+        do i = 1 to words(centers)
+            "BDT Q From Loc("center") DS("filedsn") Shr Dap("dap")" ,
+                  "To   Loc("word(centers,i)") DS("filedsn") Dap("dap")",
+                  disp_opt
+           end
+        return

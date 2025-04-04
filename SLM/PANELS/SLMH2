@@ -1,0 +1,51 @@
+)ATTR
+ ` TYPE(PT)                          /* panel title line             */
+ ? TYPE(PIN)                         /* panel instruction line       */
+ + TYPE(NT)                          /* normal text attribute        */
+ } TYPE(ET)                          /* emphasized text attribute    */
+ ~ type(text) intens(high) color(blue) hilite(reverse)
+ ! type(output) intens(high) caps(off) just(asis )
+ $ type(output) intens(high) color(blue) hilite(reverse)
+)Body  Expand(//)
+%-/-/- ~System$libt    ~Library List !ver   % -/-/-
++Selection ===>_ZCMD                                                   +
++
+                      -----------------------------------
+                      |      System Library List        |
+                      -----------------------------------
++
++  The System Library List presents a list of all active System
++  PARMLIB libraries or the specified libraries. The fields on the panel
++  are:
+
+  %Sel+     This is the line command entry field.  The only valid line
+            command is%B+to Browse the library.
+  %#+       This is the concatenation number of the system
+            library in which this member was found.
+  %Library+ This is the name of the System Library
+  %Vol+     This is volume serial number (if any) for the library
+  %Status+  Indicates if the library has been designated as the Save-To
+            Library.
++
+   More information is available on the tutorial panel for the member
+   selection list.
+)PROC
+)END
+/*  Copyright (C) 2002, Lionel B. Dyck
+/*
+/*  This program is free software; you can redistribute it
+/*  and/or modify it under the terms of the GNU General Public
+/*  License as published by the Free Software Foundation;
+/*  either version 2 of the License, or (at your option) any
+/*  later version.
+/*
+/*  This program is distributed in the hope that it will be
+/*  useful, but WITHOUT ANY WARRANTY; without even the implied
+/*  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+/*  PURPOSE.  See the GNU General Public License for more
+/*  details.
+/*
+/*  You should have received a copy of the GNU General Public
+/*  License along with this program; if not, write to the Free
+/*  Software Foundation, Inc., 59 Temple Place - Suite 330,
+/*  Boston, MA  02111-1307,

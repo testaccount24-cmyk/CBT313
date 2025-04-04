@@ -1,0 +1,52 @@
+SDSFPAGE is a tool designed to be used with SDSF to browse, print to
+sysout, print to a data set, or e-mail (using XMITIP) a page or range of
+pages from a job in the spool.
+
+EDITPAGE is a frontend to SDSFPAGE that is a more logical name than
+SDSFPAGE when used as a pure ISPF Edit command.
+
+Change history: see the SDSFPAGE REXX Code for the change history
+
+Included in the zip package is a users guide in Adobe Acrobat (PDF) format.
+
+To use:
+1. Execute member $receive to rebuild the distribution data sets
+2. copy the sdsfpage.panels into a data set in your ISPPLIB
+   concatenation
+3. copy the sdsfpage.exec into a data set in your SYSEXEC
+   concatenation.
+
+Then (under SDSF):
+1. get into SDSF
+2. Next to a Jobname or a DDname enter SE to bring up the SDSF Editor
+3. Enter on the command line SDSFPAGE options
+   where options are:
+   page#                    - for a single page
+   from-page# to-page#      - for multiple pages
+   ?                        - for a display of the syntax
+   blank                    - to display the ISPF prompting panel
+   Count                    - count the pages and insert a relative page
+                              number line of data
+                              Abbreviation: C
+4. Then select brwose, sysout, data set, e-mail, or edit
+
+Then (under ISPF Edit):
+1. get into ISPF Edit
+2. Enter on the command line EDITPAGE options
+   where options are:
+   page#                    - for a single page
+   from-page# to-page#      - for multiple pages
+   ?                        - for a display of the syntax
+   blank                    - to display the ISPF prompting panel
+   Count                    - count the pages and insert a relative page
+                              number line of data
+                              Abbreviation: C
+5. Then select brwose, sysout, data set, e-mail, or edit
+
+Pre-req: To use the E-mail option you will need the XMITIP application
+         available from http://www.geocities.com/lbdyck.
+
+Warranty: None.  Use at your own risk. While this worked at the time it
+was distributed there is no guarantee that it will work in your
+environment. Thus you should review the code and test it before use in
+any productive way.

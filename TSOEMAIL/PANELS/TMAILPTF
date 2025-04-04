@@ -1,0 +1,27 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ¦ type(output) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+)Body
++----------------------% TSO/E-Mail File UnTerse Status +-----------------------
+%Command ===>_zcmd
+%
+%
+`      File UnTerse Processing was requested.
+%
+`      Return Code from unterse: !rc
+
+`      Original Data Set:  !mailfds
+
+`      Output Data Set:    !targdsn
+
+`      TSO Mail Data Set:  !mailtds
+
+)Proc
+ &zcmd = &z
+)End

@@ -1,0 +1,22 @@
+)attr default(%+_)
+   ` type(text) intens(high) caps(off) just(asis ) color(yellow)
+   $ type(text) intens(high) color(blue)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   @ type(output) intens(high) color(blue) hilite(reverse)
+   % type(text) intens(high)
+)Body Window(42,9) Expand(\\)
+%-\-\- @cmd ~Page Print Prompt &ver%-\-\-
++
+$Enter the From and To Pages to print.
++
+$From: _fpage +   or~C+to count pages
+$To  : _tpage +
++
++PF3 to cancel or Enter to continue
+)Init
+)Proc
+ .cursor = fpage
+ if (&fpage NE C)
+    ver (&fpage,nb,num)
+ ver (&tpage,num)
+)End

@@ -1,0 +1,181 @@
+        /* ---------------------  rexx procedure  ---------------------- */
+        /* Name:      TMAILCPY                                           */
+        /*                                                               */
+        /* Function:  COPY files received by the TSOMAIL exec            */
+        /*            by prompting the user for target information       */
+        /*            and invoking either IEBCOPY or Execio.             */
+        /*                                                               */
+        /* Author:    Lionel B. Dyck                                     */
+        /*            Kaiser Permanente Information Technology           */
+        /*            25 N. Via Monte Ave.                               */
+        /*            Walnut Creek, CA 94598                             */
+        /*            (925) 926-5332                                     */
+        /*            Internet: lionel.b.dyck@kp.org                     */
+        /*                                                               */
+        /* History:                                                      */
+        /*            02/27/92 - Lionel Dyck                             */
+        /*            - add variable for vio                             */
+        /*            07/25/91 - Lionel Dyck                             */
+        /*            - correction to copy fully qualified dsns          */
+        /*            07/23/91 - Lionel Dyck                             */
+        /*            - correction for messages                          */
+        /*            - use EXECIO rather than IEBGENER for sequentials  */
+        /*            12/21/90 - Lionel Dyck                             */
+        /*            - Correction to copy seq to new pds                */
+        /*            06/25/90 - Lionel Dyck                             */
+        /*            - Correction to listdsi return code test           */
+        /*              for DFHSM migration                              */
+        /*            06/06/90 - Lionel Dyck                             */
+        /*            - Update to add this header data                   */
+        /*            - Update to correct problem with call of iebgener  */
+        /*              to use "CALL 'SYS1.LINKLIB(IEBGENER)')           */
+        /*            - Update to browse IEBCOPY SYSPRINT file           */
+        /*            - Update to reallocate SYSPRINT to terminal        */
+        /*            - Update to reallocate SYSIN to terminal           */
+        /*            06/05/90 - Mike Theys                              */
+        /*            - Update to fix IEBCOPY control card               */
+        /*            - Update to correct problem with call of iebcopy   */
+        /*              to use "TSOEXEC IEBCOPY"                         */
+        /*            11/30/89 - Lionel Dyck                             */
+        /*            - Creation of this procedure                       */
+        /*                                                               */
+        /* ------------------------------------------------------------- */
+
+        parse arg mailtds m1 m2 m3 mailfloc mailfid
+
+        parse value mailfid with mailfid debug
+
+        upper debug
+        if debug = "DEBUG" then trace i
+
+        /* set the vio variable to your vio generic */
+        vio = "SYSVIO"
+
+        mailsubj = m1 m2 m3
+
+        x = pos(".",m3)
+        newname = substr(m3,x+1,length(m3)-x)
+        new_member = ""
+
+        x = listdsi(newname)
+            select
+              when sysreason =  0 then newdisp = "SHR"
+              when sysreason =  9 then newdisp = "SHR"
+              when sysreason = 26 then newdisp = "SHR"
+              otherwise newdisp = "NEW"
+              end
+
+        if sysdsorg = "PO" & newdisp = "SHR" then newrep = "NO"
+                                             else newrep = "YES"
+
+        maillmsg = " "
+        Address ISPEXEC,
+           "VPUT (MAILTDS MAILSUBJ MAILFLOC MAILFID",
+                 "MAILLMSG NEWNAME NEWDISP NEWREP) SHARED"
+
+        copyfile:
+              parse value '' with zcmd newstat
+              Address ISPEXEC "DISPLAY PANEL(TMAILCPY)"
+              sysdsorg = " "
+              if rc = 0 then do
+                  if pos("(",newname) = 0 then newdsn = newname
+                     else do
+                          if left(newname,1) <> "'" then do
+                             newdsn = substr(newname,1,pos("(",newname)-1)
+                             end
+                             else do
+                               newdsn1 = strip(newname,,"'")
+                             newdsn = "'"substr(newdsn1,1,pos("(",newdsn1)-1)"'"
+                                  end
+                          parse value newname with . "(" new_member ")" .
+                          end
+                  x = sysdsn(newdsn)
+                  if x <> "OK" & newdisp <> "NEW" & newdisp <> "MOD" then do
+                     maillmsg = "Target data set" newname "does not exist.",
+                        "Specify Disposition of NEW."
+                     signal copyfile
+                     end
+                  if x = "OK" & newdisp = "NEW" then do
+                     maillmsg = "Target data set",
+                                 newname "exists and Disposition",
+                        "NEW specified"
+                     signal copyfile
+                     end
+              if x <> "OK" & newdisp = "MOD" then newdisp = "NEW"
+              x = listdsi(mailtds directory)
+              x = MSG("OFF")
+              if sysdsorg = "PO" & newdisp = "MOD" then do
+                     maillmsg = "Disposition of 'MOD' is not allowed for a PDS",
+                        "- specify SHR or OLD"
+                     signal copyfile
+                     end
+              if sysdsorg = "PO" then do
+                 if newrep = "YES" then
+                    y.1 = '  COPY I=((SYSUT1,R)),O=SYSUT2'
+                          else
+                    y.1 = '  COPY I=SYSUT1,O=SYSUT2'
+                   "FREE FILE(SYSUT1 SYSUT2 SYSIN SYSPRINT)"
+                   if newdisp = "NEW" then
+                   "ALLOC FILE(SYSUT2) DS("newname") NEW REUSE",
+                          "LIKE("mailtds") DIR("sysadirblk")"
+                       else
+                   "ALLOC FILE(SYSUT2) DS("newname")" newdisp "REUSE"
+                   "ALLOC FILE(SYSUT1) DS("mailtds") SHR REUSE"
+                   "ALLOC FILE(SYSIN) UNIT("vio") SPACE(1,1) TRACKS",
+                         "RECFM(F) BLKSIZE(80) NEW"
+                   "EXECIO 1 DISKW SYSIN (FINIS STEM y.)"
+                   "ALLOC FILE(SYSPRINT) DS(TMAILCPY.REPORT)",
+                          "NEW SPACE(15,15) TR"
+                   "TSOEXEC IEBCOPY"
+                   prc = rc
+                   Address ISPEXEC "BROWSE DATASET(TMAILCPY.REPORT)"
+                   x = msg("off")
+                   "FREE FILE(SYSUT1 SYSUT2 SYSIN SYSPRINT)"
+                   "DELETE TMAILCPY.REPORT"
+                   x = msg("on")
+                        end
+              else do
+                   "FREE FILE(SYSUT1 SYSUT2 SYSIN SYSPRINT)"
+                   if newdisp = "NEW" then do
+                   if pos("(",newname) > 0 then dir = "DIR(5)"
+                                           else dir = ""
+                   "ALLOC FILE(SYSUT2) DS("newname") NEW REUSE",
+                          "LIKE("mailtds")" dir
+                          end
+                       else
+                   "ALLOC FILE(SYSUT2) DS("newname")" newdisp "REUSE"
+                   "ALLOC FILE(SYSUT1) DS("mailtds") SHR REUSE"
+                   "Execio * diskr SYSUT1 (Finis Stem gener."
+                   "Execio * diskw SYSUT2 (Finis Stem gener."
+                   prc = rc
+                   size = gener.0
+                   gener. = ""
+                   if length(new_member) > 0 & newstat = "YES" then do
+                      "Alloc f(sysut2) ds("newdsn") shr reuse"
+                      Address ISPEXEC "LMINIT   DATAID(DATAID) DDNAME(SYSUT2)"
+                      Address ISPEXEC "LMOPEN   DATAID("dataid")"
+                      Address ISPEXEC,
+                         "LMMSTATS DATAID("dataid") Member("new_member")",
+                                      "Modlevel(0) Created("date('O')")",
+                                      "Moddate("date('O')")",
+                                      "Modtime("left(time(),5)")",
+                                      "Cursize("size") Initsize("size")",
+                                      "Modrecs(0)",
+                                      "User("sysvar('sysuid')")"
+                      Address ISPEXEC "LMCLOSE  DATAID("dataid")"
+                      Address ISPEXEC "LMFREE   DATAID("dataid")"
+                      end
+                   "FREE FILE(SYSUT1 SYSUT2)"
+                   end
+              mailsmsg = "Copied rc:" prc
+              maillmsg = mailtds "copied to" newname "rc =" prc
+              end
+              else do
+                   mailsmsg = "Cancelled"
+                   maillmsg = "Copy operation cancelled by user request"
+                   end
+
+              Address ISPEXEC "SETMSG MSG(MAIL000)"
+              "ALLOC FILE(SYSPRINT) DS(*) REUSE"
+              "ALLOC FILE(SYSIN)    DS(*) REUSE"
+              exit 0

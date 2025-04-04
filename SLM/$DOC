@@ -1,0 +1,47 @@
+This partitioned dataset contains the following members:
+
+$RECEIVE - issue 'hlq.SLM.PDS($RECEIVE)' to create usable
+           asm, exec, load, msgs, and panels datasets
+ASM      - assembler source
+CHANGES  - change history for this application
+EXEC     - tso transmit format rexx exec
+LICENSE  - GNU Public License under which this package is made
+           available
+LOAD     - tso transmit format load library (with SLMREXXF module)
+MSGS     - tso transmit format ispf msgs
+PANELS   - tso transmit format ispf panels
+
+Dependencies: OS/390 Version 2 Release 10 or above.
+
+To test this application you can use the sample rexx exec in the exec
+library called TESTSLM to allocate the appropriate libraries and
+invoke the application.
+
+NOTE: that local customizations are made in the SLMCUST rexx exec.
+
+Updates are posted at my web site at http://www.lbdsoftware.com
+
+Mutual support, questions, suggestions, etc. is supported at:
+
+Home Page:    http://groups.yahoo.com/group/system_library_manager/
+
+Post message: system_library_manager@yahoogroups.com
+Subscribe:    system_library_manager-subscribe@yahoogroups.com
+Unsubscribe:  system_library_manager-unsubscribe@yahoogroups.com
+
+
+Copyright (C) 2002, Lionel B. Dyck
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.

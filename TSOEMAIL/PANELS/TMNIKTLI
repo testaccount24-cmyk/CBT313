@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(input) intens(low ) caps(on) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++------------------------% TSO/E-Mail Nickname Entry +--------------------------
+%Command ===>_zcmd
+%
+%
+%   Enter the new nickname to be added to the nickname list of:!nickname
+
+%   Nickname ===>~newid   +
+%
+`   The specified nickname may be a nickname for a user or the nickname
+`   of another list.
+`
+`   At this time the specified nickname is not validated by this
+`   application.
++
+%   Press PF3 to cancel the update or Enter to register the update
+)Init
+ &newid = &z
+)Proc
+   ver (&newid,nb)
+)End

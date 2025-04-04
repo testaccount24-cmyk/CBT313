@@ -1,0 +1,62 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(  text) intens(high) caps(off) just(asis ) color(white)
+   ! type(output) intens(high) caps(off) just(asis )
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   ` type(output) intens(high) color(blue) hilite(reverse)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+)Body  Expand(//)
+%-/-/- `pantype  $libt    ~Local Datasets !ver   %-/-/-
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+  !filtero
++Commands    :%Active%All%Browse%Dup%Edit%Filter%Locate%New%Refresh%Report%Sort
++Line Options:%B+Browse%C+Compare%D+Delete%E+Edit%M+Move%R+Rename%V+View
++
+¬S Name       Lib   VV MM  Created  Changed         Size   Init    Mod  ID
+)Model
+@z!z         !z +  !z !z  !z       !z       !z    !z    +!z    +!z    +!z
+)Init
+  .HELP = SLMH1
+  .ZVARS = '(ZSEL Mem lib zlvers zlmod zlcdate zlmdate zlmtime +
+             zlcnorc zlinorc zlmnorc zluser)'
+  &A = '*****************************'
+  &C = 'End of Member List'
+  &ZTDMARK = '&A. &C. &A.'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+ &row = &z
+ if (&ZCMD = &Z)
+     if (&ztdsels = 0000)
+        &row = .csrrow
+        if (&row ¬= &z)
+            if (&zsel = &z)
+                &zsel = B
+     if (&ztdsels ¬= 0000)
+         &row = &z
+     if (&ZSEL ¬= &Z)
+       if (&Zsel = '=')
+           &Zsel = &osel
+     &osel = &zsel
+)End
+/*  Copyright (C) 2002, Lionel B. Dyck
+/*
+/*  This program is free software; you can redistribute it
+/*  and/or modify it under the terms of the GNU General Public
+/*  License as published by the Free Software Foundation;
+/*  either version 2 of the License, or (at your option) any
+/*  later version.
+/*
+/*  This program is distributed in the hope that it will be
+/*  useful, but WITHOUT ANY WARRANTY; without even the implied
+/*  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+/*  PURPOSE.  See the GNU General Public License for more
+/*  details.
+/*
+/*  You should have received a copy of the GNU General Public
+/*  License along with this program; if not, write to the Free
+/*  Software Foundation, Inc., 59 Temple Place - Suite 330,
+/*  Boston, MA  02111-1307,

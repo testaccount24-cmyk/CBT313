@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(left ) color(white)
+   ¦ type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(right) color(white)
+         hilite(uscore)
+   ~ type(text) intens(high) caps(off) just(asis ) color(white)
+         hilite(uscore)
+)Body
++--------------------------% TSO/E-Mail Processing +----------------------------
+%
+%
+%
+%
+%              Your are currently using your`TSO/E-Mail%on your split
+%                               ISPF Session.
+
+%              Use PF9 to swap to your other session and then use the
+%                          TSO/E-Mail`Refresh%command.
+
+
+%                            Press`END%to continue
+)Init
+)Proc
+)End

@@ -1,0 +1,31 @@
+)Attr
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type( input) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++------------------------% TSO/E-Mail Log Processing +--------------------------
+%Command ===>_zcmd
+
+%
+% Log Data Set Description%===>¬logdesc                                        +
+%
+% Log Data Set Name:           !logds
+%
+%
+%
+` Notes:   The description will appear in the display of your TSO/E Mail
+`          Logs and helps to easily identify the different logs you may
+`          have created.
+`
+`          The log data set name may not be changed.
+)Init
+ .CURSOR = logdesc
+ .HELP = TMAILH3
+ &zcmd = &z
+)Proc
+ Ver (&logdesc,nb)
+)End

@@ -1,0 +1,9 @@
+        /* rexx */
+        arg userid
+
+        cmd = "Tmailqry"
+
+        if length(userid) = 0 then cmd
+                              else cmd userid
+        if rc = 0 then say "Mail waiting to be received"
+                  else say "No Mail to be received at this time"
