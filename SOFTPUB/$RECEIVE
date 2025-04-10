@@ -1,0 +1,32 @@
+        /* this rexx exec is expected to be invoked by the EXEC command
+           thus:
+           EXec 'dsname(RECEIVE)'
+           and it will then issue the TSO RECEIVE command for the
+           EXEC and PANELS members to create new datasets:
+           userid.softpub.NEW.DOC
+           userid.softpub.NEW.EXEC
+           userid.softpub.NEW.MSGS
+           userid.softpub.NEW.PANELS
+           userid.softpub.NEW.SKELS
+           userid.softpub.NEW.TABLE
+           You will then need to copy these datasets/members into
+           datasets for production use.
+           */
+
+        parse source with x1 x2 x3 dsn .
+         x = PROMPT("ON") /* enable prompting */
+        queue "dsn(softpub.new.exec)"
+        "Receive inds('"dsn"(exec)')"
+        queue "dsn(softpub.new.msgs)"
+        "Receive inds('"dsn"(msgs)')"
+        queue "dsn(softpub.new.panels)"
+        "Receive inds('"dsn"(panels)')"
+        queue "dsn(softpub.new.skels)"
+        "Receive inds('"dsn"(skels)')"
+        queue "dsn(softpub.new.table)"
+        "Receive inds('"dsn"(table)')"
+        queue "dsn(softpub.new.doc)"
+        "Receive inds('"dsn"(doc)')"
+        if sysvar('sysispf') <> "ACTIVE" then exit
+        Address ISPEXEC
+           "Browse dataset('"dsn"($doc)')"

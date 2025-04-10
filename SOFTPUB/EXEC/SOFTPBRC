@@ -1,0 +1,48 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPBRC                                           *
+         *                                                               *
+         * Function:  Called by SOFTPUBA to issue an HRECALL for all     *
+         *            book shelves.                                      *
+         *                                                               *
+         * Syntax:    %SOFTPBRC                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            25 N. Via Monte                                    *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: syslbd@ncal.kaiperm.org                  *
+         *                                                               *
+         * History:                                                      *
+         *            12/31/97 - trap hrecall messages (hide them)       *
+         *            01/08/96 - fixup to use actual list of shelves     *
+         *            12/26/95 - created                                 *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+
+        "%SOFTPDFT"
+        Address ISPEXEC "VGET (BUILD)"
+        build_table = strip(build,,"'")
+        ddn      = "SFT"random()
+        "Alloc f("ddn") SHR DS('"build_table"(BUILD)')"
+        "Execio * Diskr" ddn "(Finis Stem build."
+        "Free f("ddn")"
+
+        Do i = 1 to build.0
+          parse value build.i with type dsname .
+          if type = "S" then call do_bkshelf
+          end
+
+        Exit
+
+        do_bkshelf:
+          call listdsi "'"dsname"' norecall"
+          if sysvolume = "MIGRAT" then do
+             call outtrap 'hr.'
+             "Hrecall 'dsname' Wait"
+             call outtrap 'off'
+             drop hr.
+             end
+          return

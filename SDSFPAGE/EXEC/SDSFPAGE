@@ -1,0 +1,728 @@
+        /* --------------------  rexx procedure  -------------------- */
+         ver = "1.28"
+        /* Name:      sdsfpage                                        *
+         *                                                            *
+         * Function:  Extract selected pages from an SDSF Edit        *
+         *            session and prompt for print, dataset, or mail. *
+         *                                                            *
+         * Syntax:    %sdsfpage options                               *
+         *            options = ? for syntax                          *
+         *                    = blank for ispf prompt panel           *
+         *                    = from-page (for just one page)         *
+         *                    = from-page to-page (for range)         *
+         *                    = Count (abbreviation C) to count       *
+         *                                                            *
+         *            if no to-page then only 1 page will be          *
+         *            processed.                                      *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *            Kaiser Permanente Information Technology        *
+         *            Walnut Creek, CA 94598                          *
+         *            (925) 926-5332                                  *
+         *            Internet: lionel.b.dyck@kp.org                  *
+         *                                                            *
+         * History:                                                   *
+         *            04/24/03 - Version 1.28                         *
+         *                     - Add ISPExec Control Errors Return    *
+         *            10/22/02 - Version 1.27                         *
+         *                     - SET NOTRC if CHARS set               *
+         *                       thanks to Joachim Rassmann           *
+         *            05/29/02 - Version 1.26                         *
+         *                     - Allow format on e-mail option        *
+         *                       from panel                           *
+         *            04/18/02 - Version 1.25                         *
+         *                     - Redesign to all options return to    *
+         *                       the SDSFPAGE menu                    *
+         *                     - Add transfer option                  *
+         *                     - Allow letters to select options      *
+         *                       e.g. B for Browse                    *
+         *            03/13/02 - Version 1.24                         *
+         *                     - Fix if Count option used with no cc  *
+         *            02/18/02 - Version 1.23                         *
+         *                     - Fix use after COUNT                  *
+         *            02/12/02 - Version 1.22                         *
+         *                     - Fix ASA CC lookup                    *
+         *            02/01/02 - Version 1.21                         *
+         *                     - Support for XMITIP v4.50 with new    *
+         *                       keyword in the call (noattr)         *
+         *            01/30/02 - Version 1.20                         *
+         *                     - Change sdsf.report to sdsf.txt       *
+         *            09/20/01 - Version 1.19                         *
+         *                     - strip trailing blanks from data      *
+         *            09/10/01 - Version 1.18                         *
+         *                     - fix Copy to DS after Edit            *
+         *            09/05/01 - Version 1.17                         *
+         *                     - Correction to test for DCB properly  *
+         *                     - Correctly handle NO CC               *
+         *            09/05/01 - Version 1.16                         *
+         *                     - Minor tweat to xmitip subject        *
+         *            09/04/01 - Version 1.15                         *
+         *                     - Add EDIT option (5)                  *
+         *                     - Add support for EDITPAGE frontend    *
+         *            07/11/01 - Version 1.14                         *
+         *                     - Correct usage for email when hlq diff*
+         *            05/30/01 - Version 1.13                         *
+         *                     - Correct usage of Outdes for print    *
+         *            05/07/01 - Version 1.12                         *
+         *                     - Remove the >>> Page on Count         *
+         *            04/30/01 - Version 1.11                         *
+         *                     - Change Print to DS message for       *
+         *                       correct status (created or updated)  *
+         *                     - Correct allocation if member         *
+         *            03/23/01 - Version 1.10                         *
+         *                     - Change to support PROFILE NOPREFIX   *
+         *            03/21/01 - Version 1.09                         *
+         *                     - Change the Count page msg to a real  *
+         *                       line of data to allow a search.      *
+         *            03/20/01 - Version 1.08                         *
+         *                     - Add option C to count pages          *
+         *            03/20/01 - Version 1.07                         *
+         *                     - Fix printing bug with outdes         *
+         *            03/13/01 - Version 1.06                         *
+         *                     - Add chars option to print            *
+         *            03/07/01 - Version 1.05                         *
+         *                     - Add outdes option to print           *
+         *            02/28/01 - Version 1.04                         *
+         *                     - Change No Pagination message         *
+         *            02/26/01 - Version 1.03                         *
+         *                     - Support No Pagination                *
+         *            02/21/01 - Version 1.02                         *
+         *                     - fix lrecl setting                    *
+         *            02/20/01 - Version 1.01                         *
+         *                     - set space for data set copy          *
+         *                     - fix extra mach cc place holders      *
+         *            02/20/01 - Version 1.00                         *
+         *                     - CLeanup syntax                       *
+         *                     - Add cancel message if PF3            *
+         *                     - Support Machine CC                   *
+         *                     - Rearrange options                    *
+         *                     - add browse option with return to     *
+         *                       option display                       *
+         *            02/17/01 - Add popup if no parameters.          *
+         *            02/16/01 - Ignore dir(0) for data set allocate  *
+         *            02/16/01 - Creation                             *
+         * ---------------------------------------------------------- */
+
+        /* --------------------------------------------------------- *
+         * Setup Edit Macro                                          *
+         * --------------------------------------------------------- */
+        Address ISREDIT
+        "Macro (page)"
+
+        /* --------------------------------------------------------- *
+         * Setup Environment based on Calling Parms                  *
+         * --------------------------------------------------------- */
+        if pos("/EDIT",page) > 0 then do
+           parse value page with page "/EDIT"
+           cmd = "EDIT"
+           end
+        else cmd = "SDSF"
+
+        /* --------------------------------------------------------- *
+         * Save the original command and options                     *
+         * --------------------------------------------------------- */
+        orig_command = sysvar('sysicmd') page
+
+        /* --------------------------------------------------------- *
+         * Set defaults                                              *
+         * --------------------------------------------------------- */
+        count = 0
+        parse value "" with null topage last_line msg endit od odes cc
+        Address ISPExec "Control Errors Return"
+
+        /* --------------------------------------------------------- *
+         * Test for input.  If none then display popup prompt.       *
+         * If PF3 (rc=8) then exit, otherwise continue.              *
+         * --------------------------------------------------------- */
+        if page = "?" then signal do_syntax
+        if page = null then do
+           Address ISPExec
+           "Addpop"
+           "Display panel(sdsfppop)"
+           src = rc
+           "Rempop"
+           if src > 0 then do
+              zedsmsg = "Cancelled."
+              zedlmsg = "SDSF Page Print Cancelled."
+              "Setmsg msg(isrz001)"
+              exit 0
+              end
+           page = fpage tpage
+           end
+        Address ISREdit
+
+        /* --------------------------------------------------------- *
+         * Test for data set name. If using ISPF Edit this will work *
+         * and then we can get a reliable RECFM.                     *
+         * --------------------------------------------------------- */
+        "(dataset) = dataset"
+        if length(dataset) > 0 then do
+           call listdsi "'"dataset"'"
+           Select
+             when right(sysrecfm,1) = "A" then recfm = "A"
+             when right(sysrecfm,1) = "M" then recfm = "M"
+             otherwise recfm = null
+             end
+         end
+         else recfm = "X"
+
+        /* --------------------------------------------------------- *
+         * Deteremine CC Type (ASA or Mach)                          *
+         * --------------------------------------------------------- */
+         "(line) = line" 1
+         cc = left(line,1)
+         if left(line,6) = ">>>>> " then do
+            "Exclude all"
+            "Find '>>>>> Page Number:' 1 All"
+            "del nx all"
+            "reset"
+            "Up Max"
+            "(line) = line" 1
+            cc = left(line,1)
+            end
+         if cc = "1" then cc = "F1"
+         if recfm = "X" then do
+            Select
+              When cc = "1" then cc = "F1"
+              When cc = " " then cc = "F1"
+              when c2x(cc) = "89" then cc = "89"
+              when c2x(cc) = "8B" then cc = "8B"
+              Otherwise cc = "F1"
+              end
+            if cc = "F1" then recfm = "A"
+                         else recfm = "M"
+            end
+         if pos(cc,"89 8B F1") = 0 then cc = null
+
+        /* --------------------------------------------------------- *
+         * If Machine CC=8B then edit for pagination.                *
+         * --------------------------------------------------------- */
+         if cc = "8B" then call sdsfpmcc "I"
+
+        /* --------------------------------------------------------- *
+         * Determine if the Count (C) option was requested.  If so   *
+         * then find each page eject and insert a line of data       *
+         * before that record.                                       *
+         * --------------------------------------------------------- */
+         page = translate(page)
+         if left(page,1) = "C" then do
+            "Exclude all"
+            "Find '>>>>> Page Number:' 1 All"
+            "del nx all"
+            "reset"
+            "Up Max"
+            fopt = "First"
+            count = 0
+            do forever
+               if cc <> null then
+                  "Find '"x2c(cc)"' 1" fopt
+               else rc = 4
+               if rc > 0 then do
+                         if count = 0 then do
+                            zedsmsg = "Warning!"
+                            zedlmsg = "Data set contains no carriage",
+                                      "control so we can not determine",
+                                      "pagination."
+                            end
+                         else do
+                              zedsmsg = "Counted" count
+                              zedlmsg = count "Total Pages Counted."
+                            end
+                         Address ISPExec ,
+                            "Setmsg msg(isrz001)"
+                         "Up Max"
+                         Exit 0
+                         end
+               "(line) = cursor"
+               count = count + 1
+               text = ">>>>> Page Number:" count "<<<<<"
+               "LINE_BEFORE" line "= Dataline '"text"'"
+               fopt = "Next"
+               end
+            end
+
+        /* --------------------------------------------------------- *
+         * Verify from and to page values                            *
+         * --------------------------------------------------------- */
+        if words(page) > 1 then
+           parse value page with page topage
+
+        if datatype(page) <> "NUM" then do
+           msg = "Error: From Page value is not numeric:" page
+           signal error_input
+           end
+        if topage = null then topage = page
+        if datatype(topage) <> "NUM" then do
+           msg = "Error: To Page Value not numeric:" topage
+           signal error_input
+           end
+
+        /* --------------------------------------------------------- *
+         * Add 1 to the ToPage so we get the first line of to page   *
+         * --------------------------------------------------------- */
+        if topage <> null then do
+           topage = topage + 1
+           end
+
+        /* --------------------------------------------------------- *
+         * Find the First Page                                       *
+         * --------------------------------------------------------- */
+        Address ISREdit
+        if recfm <> null then
+          "Find '"x2c(cc)"' 1 First"
+        else rc = 1
+        if rc > 0 then do
+           first_line = 1
+           last_line = null
+           zedsmsg = null
+           zedlmsg = left("Warning!",80),
+                     "No Pagination Found. Entire File Selected."
+           Address ISPExec ,
+              "Setmsg msg(isrz001)"
+           signal do_copy
+           end
+        "(line) = cursor"
+        line = line + 0
+        count = count + 1
+        if count = page then do
+           first_line = line
+           end
+
+        /* --------------------------------------------------------- *
+         * Now Find the From-Page                                    *
+         * --------------------------------------------------------- */
+        if page = 1 then signal Find_Topage
+        do forever
+           "Find '"x2c(cc)"' 1 Next"
+           if rc > 0 then leave
+            "(line) = linenum .zcsr"
+            count = count + 1
+            if count = page then do
+               first_line = line
+               if topage <> null then signal find_topage
+               exit 0
+               end
+         end
+         Say "Page" page "not found."
+         exit 4
+
+        /* --------------------------------------------------------- *
+         * Now Find the To-Page                                      *
+         * --------------------------------------------------------- */
+        Find_Topage:
+        xrc = 0
+        do until xrc > 0
+           "Find '"x2c(cc)"' 1 Next"
+           xrc = rc
+           if xrc > 0 then leave
+            "(line) = linenum .zcsr"
+            count = count + 1
+            if count = topage then do
+               last_line = line - 1
+               xrc = 4
+               end
+            end
+
+        /* --------------------------------------------------------- *
+         * Copy selected Page(s) into stem                           *
+         * --------------------------------------------------------- */
+        do_copy:
+        o = 1
+        lrecl = 0
+        data. = null
+        if last_line = null then do
+           "(line) = linenum .zl"
+           last_line = line
+           end
+        Do i = first_line to last_line
+           "(line) = line" i
+           if left(line,6)  = x2c(8B)"<====" then iterate
+           if left(line,10) = ">>>>> Page" then iterate
+           data.o = strip(line,"trail")
+           if length(data.o) = 0 then data.o = " "
+           o = o + 1
+           len = length(line)
+           if lrecl < len then
+              lrecl = len
+           end
+         data.0 = 0
+
+        /* --------------------------------------------------------- *
+         * If Machine CC=8B then edit to remove extras.              *
+         * --------------------------------------------------------- */
+         if cc = "8B" then call sdsfpmcc "R"
+
+        /* --------------------------------------------------------- *
+         * Return to the Top of the Page                             *
+         * --------------------------------------------------------- */
+         "Up Max"
+
+        /* --------------------------------------------------------- *
+         * Define and create the temp data set to contain the select *
+         * lines of information.                                     *
+         * --------------------------------------------------------- */
+        Address TSO
+        parse value time() with hh":"mm":"ss
+        ddn  = "sp"hh""mm""ss
+        ddon = "op"hh""mm""ss
+        if sysvar('syspref') = sysvar('sysuid') then
+           dsn = cmd"page."ddn
+        else
+           dsn = "'"sysvar("sysuid")"."cmd"page."ddn"'"
+        "Alloc f("ddn") new spa(90,90) tr" ,
+         "dsn("dsn") release" ,
+         "recfm(v b" recfm") lrecl("lrecl+4") blksize(0)"
+        "Execio * diskw" ddn "(finis stem data."
+        "Free f("ddn")"
+
+        /* --------------------------------------------------------- *
+         * Display Output Prompt Panel                               *
+         * --------------------------------------------------------- */
+         Display:
+         do forever
+            Address ISPExec
+            "Display Panel(sdsfpage)"
+            if rc > 3 then leave
+            if zcmd <> null then call do_it
+            end
+
+        /* ------------------------------------------ *
+         * Delete the working data set and then Exit. *
+         * ------------------------------------------ */
+         Address TSO
+         call msg "off"
+         "Delete" dsn
+         exit 0
+
+        /* --------------------------------------------------------- *
+         * Process the selection                                     *
+         * --------------------------------------------------------- */
+         Do_IT:
+         zcmd = translate(zcmd)
+         Select
+           When zcmd = 1 then call do_browse
+           When zcmd = "B" then call do_browse
+           When zcmd = 2 then call do_sysout
+           When zcmd = "P" then call do_sysout
+           When zcmd = 3 then call do_dataset
+           When zcmd = "C" then call do_dataset
+           When zcmd = 4 then call do_email
+           When zcmd = "M" then call do_email
+           When zcmd = 5 then call do_edit
+           When zcmd = "E" then call do_edit
+           When zcmd = 6 then call do_transfer
+           When zcmd = "T" then call do_transfer
+           Otherwise do
+              zedsmsg = "Cancelled."
+              zedlmsg = "SDSF Page Print cancelled."
+              Address ISPExec "Setmsg msg(isrz001)"
+              end
+           end
+           return
+
+        /* --------------------------- *
+         * Browse the selected page(s) *
+         * --------------------------- */
+         Do_Browse:
+         zcmd = null
+         "Browse Dataset("dsn")"
+         return
+
+        /* --------------------------- *
+         * Edit the selected page(s)   *
+         * --------------------------- */
+         Do_Edit:
+         zcmd = null
+         "Edit Dataset("dsn")"
+         drop data.
+         Address TSO
+         "Alloc f("ddon") shr ds("dsn")"
+         "Execio * diskr" ddon "(Finis stem data."
+         "Free f("ddon")"
+         return
+
+        /* --------------------------------------------------------- *
+         * Process to Sysout                                         *
+         * --------------------------------------------------------- */
+         Do_Sysout:
+         zcmd = null
+         "Display Panel(sdsfpags)"
+         if rc > 0 then return
+         "Vput (spc spcp spfm spdest spfcb spucs sppm sppdef" ,
+               "spfdef spodes schr) Profile"
+
+        /* --------------------- *
+         * Setup PRINTDS options *
+         * --------------------- */
+         Address TSO
+         if spc <> null then
+            propt = "Class("spc")"
+         if spcp <> null then
+            propt = propt "Copies("spcp")"
+         if schr <> null then
+            propt = propt "Chars("schr") NoTRC"
+         if spfm <> null then
+            propt = propt "Forms("spfm")"
+         if spdest <> null then
+            propt = propt "Dest("spdest")"
+         if spfcb <> null then
+            propt = propt "Fcb("spfcb")"
+         if spucs <> null then
+            propt = propt "UCS("spucs")"
+        /* ----------------------- *
+         * Test for OUTDES options *
+         * ----------------------- */
+         if sppm <> null then
+            od = "PRMode("sppm")"
+         if sppdef <> null then
+            od = od "Pagedef("sppdef")"
+         if spfdef <> null then
+            od = od "Formdef("spfdef")"
+         if spodes =  null then
+            if od <> null then do
+               "Outdes" ddn "New" od
+               end
+               else ddn = null
+         if spodes <>  null then do
+              ddn = spodes
+              end
+         if ddn <> null then
+            odes = "Outdes("ddn")"
+
+        /* ---------------------------------- *
+         * Issue the PRINTDS command to print *
+         * ---------------------------------- */
+         "Pr dsn("dsn")" odes propt
+
+         if spodes =  null then
+            if od <> null then
+               "Free outdes("ddn")"
+
+         zedsmsg = "Printed"
+         zedlmsg = "SDSF Report printed to:" spdest
+         Address ISPExec "Setmsg msg(isrz001)"
+         return
+
+        /* ------------------------------------------------------- *
+         * Do File Transfer                                        *
+         *   - support FTP (from the users workstation)            *
+         * ------------------------------------------------------- */
+         Do_Transfer:
+            call get_tcpip
+            "Control Display Save"
+            sf_dsn = dsn
+            parse var dsn ldsn"."rdsn
+            dsn = ldsn".xfer.txt"
+            if left(dsn,1) = "'" then dsn = "'"
+            call msg 'off'
+            Address TSO "Delete" dsn
+            Address TSO "Rename" sf_dsn dsn
+            zcmd = null
+            do forever
+               "Display panel(sdsfpxfr)"
+               xrc = rc
+               if pos("IND$FILE",zcmd) > 0 then do
+                  xrc = 1
+                  "Select cmd("zcmd")"
+                  end
+               zcmd = null
+               if xrc > 0 then leave
+               end
+            "Control Display Restore"
+            zedsmsg = "Complete."
+            zedlmsg = "File transfer request for" dsn ,
+                      "has been completed."
+            Address ISPExec
+            "Setmsg msg(isrz001)"
+            act = sel
+            Address TSO "Rename" dsn sf_dsn
+            dsn = sf_dsn
+            return
+
+        /* ----------------------------------- *
+         * Get current TCP/IP Host information *
+         * ----------------------------------- */
+         Get_Tcpip:
+            res    = Socket('Initialize','ANYNAME')
+            host   = Socket('GetHostId')
+            name   = word(Socket('GetHostname'),2)
+            domain = word(Socket('GetDomainName'),2)
+            res    = Socket('Terminate')
+            ftphost = name"."domain
+            return
+
+        /* --------------------------------------------------------- *
+         * Process to Data Set                                       *
+         * --------------------------------------------------------- */
+         Do_Dataset:
+         zcmd = null
+         call listdsi dsn
+         sppq     = sysalloc
+         spsq     = sysseconds
+         spal     = "TR"
+         sprecfm  = sysrecfm
+         splrecl  = syslrecl
+         spblksiz = sysblksize
+         "Display Panel(sdsfpagd)"
+         if rc > 0 then return
+         "Vput (spdsn spmem spd spmc spsc spvol spdc spal sppq" ,
+               "spsq spdir sprecfm splrecl spblksiz) Profile"
+         Address TSO
+         save_dsn = spdsn
+         al = "dsn("spdsn")"
+         if spmem <> null then do
+            if left(spdsn,1) = "'" then do
+               spdsn = left(spdsn,length(spdsn)-1)
+               spdsn = spdsn"("spmem")'"
+               al = "DSN("spdsn")"
+               end
+            else do
+               spdsn = spdsn"("spmem")"
+               al = "DSN("spdsn")"
+               end
+            end
+         al = al spd
+         if spd <> "NEW" then
+            if sysdsn(save_dsn) <> "OK" then do
+               msg = spdsn "requested as" spd "but doesn't exist yet."
+               endit = 1
+               signal error_input
+            end
+         if spd = "NEW" then do
+            if sysdsn(save_dsn) = "OK" then do
+               msg = spdsn "requested as New but already exists"
+               endit = 1
+               signal error_input
+               end
+            if spmc <> null then
+               al = al "Mgmtclass("spmc")"
+            if spsc <> null then
+               al = al "Storclass("spsc")"
+            if spvol <> null then
+               al = al "Vol("spvol")"
+            if spdc <> null then
+               al = al "Dataclas("spdc")"
+            if spal <> null then do
+               select
+                 when spal = "BLKS" then spalt = "BLOCK("spal")"
+                 when spal = "TRKS" then spalt = "TRACKS"
+                 when spal = "CYLS" then spalt = "Cylinders"
+                 when spal = "KB"   then spalt = "Avgrec(K)"
+                 when spal = "MB"   then spalt = "Avgrec(M)"
+                 otherwise spalt = "Tracks"
+                 end
+               al = al spalt
+               end
+            if spmem <> null then
+               if spdir = null then
+                  spdir = 5
+            if spdir <> null then
+               if spdir > 0 then
+                  al = al "Dir("spdir")"
+            if spsq <> null then
+               al = al "Spa("sppq","spsq")"
+               else
+               al = al "Spa("sppq")"
+            if sprecfm <> null then do
+               recfm = substr(sprecfm,1,1) substr(sprecfm,2,1) ,
+                       substr(sprecfm,3,1)
+               al = al "Recfm("recfm")"
+               end
+            if splrecl <> null then
+               al = al "Lrecl("splrecl")"
+            if spblksiz <> null then
+               al = al "Blksize("spblksiz")"
+            end
+         "Alloc f("ddon")" al
+         "Execio * diskw" ddon "(Finis stem data."
+         "Free f("ddon")"
+         Select
+           When spd = "MOD" then
+                zedsmsg = "Appended"
+           When spd = "NEW" then
+                zedsmsg = "Created"
+           Otherwise
+                zedsmsg = "Updated"
+            end
+         zedlmsg = "Data set" spdsn zedsmsg
+         Address ISPExec
+         "Setmsg msg(isrz001)"
+         return
+
+        /* --------------------------------------------------------- *
+         * Process to E-Mail                                         *
+         * --------------------------------------------------------- */
+         Do_Email:
+         zcmd = null
+         if fmt = null then fmt = "txt"
+         "Vput (fmt) Profile"
+         Address TSO
+         "%xmitipfe file("dsn") Subject(Report from "cmd"PAGE)" ,
+            "Filename("cmd"."fmt") Format("fmt") Noattr"
+          if rc = 0 then do
+             zedsmsg = "Mailed"
+             zedlmsg = "SDSF Report mailed."
+             Address ISPExec "Setmsg msg(isrz001)"
+             end
+         return
+
+        /* --------------------------------------------------------- *
+         * Error Routine to display the correct syntax of the comman *
+         * --------------------------------------------------------- */
+         Error_Input:
+            Say cmd"Page: Error Encountered."
+            if msg <> null then say " "
+            say msg
+            say " "
+            if endit = 1 then exit 0
+         Do_Syntax:
+            name = cmd"PAGE"
+            say "Command entered:" orig_command
+            say " "
+            say "The correct syntax is: "name" page#"
+            say "                   or: "name" from-page# to-page#"
+            say "                   or: "name" ,
+                     blank (for ISPF Prompt Panel)"
+            say "                   or: "name" C (to count)"
+            say " "
+            say "Examples:"
+            say "Print page 12:        "name" 12"
+            say "Print pages 2 thru 9: "name" 2 9"
+            say "Print pages 5 to end: "name" 5 9999"
+            say "Display prompt:       "name
+            say "Count pages:          "name" C"
+            exit 0
+
+        /* ---------------------- rexx ----------------------------- *
+         * if option I then insert, option R remove                  *
+         *                                                           *
+         * Find all occurances of x'89' and insert a  record with    *
+         * x'8B'<==== in front of for pagination.                    *
+         *                                                           *
+         * Remove the x'8B'<==== after the pagination.               *
+         * --------------------------------------------------------- */
+         SDSFPMCC: Procedure
+         arg opt
+         if opt = "" then exit 4
+         first = "First"
+         data = x2c(8B)"<===="
+         Address ISREdit
+         Select
+           When opt = "I" then do forever
+                "Find '"x2c(89)"' 1" first
+                if rc > 0 then leave
+                first = ""
+                "(line) = cursor"
+                "Line_Before" line "= '"data"'"
+                end
+           When opt = "R" then do forever
+                "Find '"x2c(8B)"<====' 1" first
+                if rc > 0 then leave
+                first = ""
+                "(line) = cursor"
+                "Delete" line
+                end
+           Otherwise nop
+           end
+           "Up Max"
+           Return

@@ -1,0 +1,60 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   @ type(output) intens(low ) caps(off) just(asis ) color(white)
+     hilite(uscore)
+   ¦ type(output) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++----------------------% TSO/E-Mail Forward Processing +------------------------
+%Command ===>_zcmd
+%
+`   Enter the Node and Userid of the person to receive the forwarded item:
+`
+`   Userid or Nickname to receive the mail or %*`
+%   Userid  %===>_fwduser
+%   Nodename%===>_fwdnode `    NJE Location for userid
+`
+`   Send the file      %===>_Z+ %Y`Yes%N`No or%M`as a message
+`
+`   Forward Flag option%===>_FWD  `%Yes No`or%Never
+`
+`   Subject: @mailsubj
+`
+`   Origin Node:         ¦mailfloc
+`          User:         ¦mailfid
+`   Original data set:   ¦mailfds
+`   Associated data set: ¦mailtds
+`
+`   The Forward flag will shift the message text right 2 columns and
+`   place a '>' in column 1.
+)Init
+ .cursor = fwduser
+ .help   = TMAILHFF
+ .ZVARS = '(MsgFILE)'
+ &Msgfile = trans(trunc(&Msgfile,1) Y,Y N,N M,M &Z,Y)
+ if (&fwd NE NEVER)
+     &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,YES &Z,YES *,*)
+)Reinit
+ if (&fwd NE NEVER)
+     &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,NO &Z,YES *,*)
+)Proc
+ IF (&FWDUSER = '*')
+     &FWDUSER = &MAILFID
+     &FWDNODE = &MAILFLOC
+ VER (&FWDUSER,NB)
+ VER (&FWDNODE,NAME)
+ IF (&FWDNODE NE &Z)
+    &FWDID = '&FWDNODE..&FWDUSER'
+ IF (&FWDNODE = &Z)
+    &FWDID = &FWDUSER
+ VER (&MSGFILE,NB,LIST,Y,N,M)
+ &FWDFILE = &MSGFILE
+ if (&fwd NE NEVER)
+    &FWD = TRANS(TRUNC(&FWD,1) Y,YES N,NO *,*)
+ Ver (&FWD,NB,List,YES,NO,NEVER)
+ VPUT (FWD) PROFILE
+)End

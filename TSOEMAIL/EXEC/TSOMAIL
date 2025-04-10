@@ -1,0 +1,2264 @@
+        /* ----------------- tso rexx procedure ----------------------------- */
+        tmver = "2.54"
+        /* This is a REXX exec that is intended to provide full mail          *
+         * processing capabilities for the TSO user.                          *
+         *                                                                    *
+         * Logic:                                                             *
+         *                                                                    *
+         * 1)  Process entry options                                          *
+         *   - debug will cause the REXX instruction tracing to be activated  *
+         *   - USERID(userid) causes this exec to receive for another userid  *
+         *     (executing user must have TSO OPER)                            *
+         *   - SAFE is used by the SAFEMAIL facility that will be             *
+         *     implemented as a started task or regularly scheduled batch     *
+         *     job (BATCH is assumed when this option is specified).          *
+         *   - READ will display the mail table immediately without reading   *
+         *     any new mail.                                                  *
+         *   - NOMSG will only display the panels and table if there is new   *
+         *     mail to read as determined by the RECEIVE command receiving    *
+         *     anything.                                                      *
+         *   - BATCH will build the table in batch and then exit with no      *
+         *     display processing occuring - AND NO RECEIVE PROCESSING.       *
+         *     This must be executed under that TMP in batch as:              *
+         *     PROFILE PREFIX(userid)                                         *
+         *     * allocate necessary ispf data sets *                          *
+         *     ISPF CMD(%TSOMAIL BATCH USERID(userid)) NEWAPPLID(MAIL)        *
+         * 1b) Verify that the TSOMAIL Table data set exists and if not       *
+         *     do a 1 time test:                                              *
+         *     - test if a log data set previously exists                     *
+         *       - if not continue                                            *
+         *       - if it does then allow the user to:                         *
+         *         - delete it                                                *
+         *         - edit it to remove old/unwanted messages                  *
+         * 2)  Process the TSO RECEIVE command using the LOGDSNAME to         *
+         *     file all messages into the dataset:                            *
+         *     userid.TSOMAIL.LOG                                             *
+         *     Files are received into datasets of the form:                  *
+         *     userid.TSOMAIL.Dyymmdd.Thhmmss.DATA                            *
+         * 3)  Terminate the exec if SAFE was specified                       *
+         * 4)  Verify that we were entered under the ISPF Applid of MAIL      *
+         * 5)  Process the userid.TSOMAIL.LOG and create an ISPF              *
+         *     table entry for every message and file.                        *
+         *   - use LISTDSI to determine if the table data set is large        *
+         *     enough or has enough room, if not create, copy and delete.     *
+         *     (it must have less than 10 extents and more than 5 free        *
+         *      directory blocks to be acceptable)                            *
+         *   - messages are placed into the partitioned data set in which     *
+         *     the ISPF table is stored                                       *
+         *   - files will remain in the data sets in which they were received *
+         *     into                                                           *
+         * 6)  Display the ISPF Mail table                                    *
+         *   - Command options:                                               *
+         *     - Find any character string in any row in the table (1.50)     *
+         *     - Refresh                                                      *
+         *       processes new mail into the table                            *
+         *     - Sendmail                                                     *
+         *       invoke the send mail dialog to send a message or file        *
+         *     - Sort field-name value (or Sort blank to display menu) (1.43) *
+         *     - Defaults                                                     *
+         *       establish or change the current TSO Mail defaults            *
+         *   - Line options:                                                  *
+         *     - A:  Send a message to the sender of the message/file         *
+         *     - B:  alias for 'S'                                            *
+         *     - C:  Change subject in table                                  *
+         *     - D:  Delete the message or file                               *
+         *     - E:  Edit the message or file                                 *
+         *     - F:  Forward the message or file to another user              *
+         *     - L:  Log the message into a log table/data set                *
+         *     - P:  Print the message or file                                *
+         *     - M:  Merge the data set into the message                      *
+         *     - R:  alias for 'S'                                            *
+         *     - S:  Select a message for reading or a file for processing    *
+         *           - 0:  Read the message that accompanied the data set     *
+         *           - 1:  Browse the data set                                *
+         *           - 2:  Edit the data set                                  *
+         *           - 3:  Print the data set                                 *
+         *           - 4:  Rename the data set                                *
+         *           - 5:  Copy the data set                                  *
+         *           - 6:  Use the PDS Command on the data set                *
+         *           - 7:  Delete the data set                                *
+         *           - 8:  Process the file using the UNTERSE utility         *
+         *           - 9:  Forward the data set to another user               *
+         *                                                                    *
+         * ------------------------------------------------------------------ *
+         * Change history:                                                    *
+         *                                                                    *
+         *  01/04/00 - 2.54   y2k fix for maildatd in the table               *
+         *                                                                    *
+         *  01/03/00 - 2.53   y2k fix for maildatn in the table               *
+         *                    fix sort d option                               *
+         *                                                                    *
+         *  08/13/99 - 2.52   y2k                                             *
+         *                                                                    *
+         *  11/17/97 - 2.51   minor cleanup on reset_profile routine          *
+         *                                                                    *
+         *  09/10/96 - 2.50   change table variable name                      *
+         *                                                                    *
+         *  05/06/96 - 2.49   If node=ibmmail then reply to ibmmail.com       *
+         *                                                                    *
+         *  04/12/95 - 2.48   Fix for find/rfind                              *
+         *                                                                    *
+         *  03/10/95 - 2.47   Fix for SMTP started task name of SMTP?         *
+         *                                                                    *
+         *  12/15/94 - 2.46   Customized for Kaiser                           *
+         *                                                                    *
+         *  09/23/94 - 2.45   Fixed find with no arguement - just returns now *
+         *                                                                    *
+         *  06/06/94 - 2.44   Add tmailqry to refresh                         *
+         *                                                                    *
+         *  03/30/94 - 2.43   Fix profile reset                               *
+         *                    Change test for INMR901I to INMR906A            *
+         *                                                                    *
+         *  03/21/94 - 2.42   fix printing of message data set closing table  *
+         *                                                                    *
+         *  03/17/94 - 2.41   correct reply-to: processing                    *
+         *                                                                    *
+         *  03/07/94 - 2.40   fix to correct receive not working for datasets *
+         *                    intermittently                                  *
+         *                                                                    *
+         *  01/27/94 - 2.39   Fix log table access if migrated                *
+         *                                                                    *
+         *  01/19/94 - 2.38   Fix test for log and table data set             *
+         *                                                                    *
+         *  01/19/94 - 2.37   Test for migrated tsomail.table and prompt      *
+         *                                                                    *
+         *  01/10/94 - 2.36   Clean up debug data set processing.             *
+         *                                                                    *
+         *  01/07/94 - 2.35   Delete the debug data set if receive is ok.     *
+         *                                                                    *
+         *  12/26/93 - 2.34   Add log of all messages for error checking.     *
+         *                                                                    *
+         *  10/11/93 - 2.33   Add prompt for print when message and d/s in    *
+         *                    same message.                                   *
+         *                                                                    *
+         *  09/24/93 - 2.32   Update to put messages w/lrecl>80 into pds      *
+         *                    per request by Bruce Bordonaro                  *
+         *                                                                    *
+         *                    Create variable for blksizes (FB_Blksize and    *
+         *                    VB_Blksize) to allow SDB if enabled.            *
+         *                                                                    *
+         *  06/15/93 - 2.31   Fix Delete prompt that deleted even if PF3      *
+         *                                                                    *
+         *  06/14/93 - 2.30   Allow a file to be Forwarded as a Message       *
+         *                    Add 'recall' to listdsi for log data set.       *
+         *                                                                    *
+         *  06/07/93 - 2.29   Add 'DN' Delete-all Noprompt option             *
+         *                                                                    *
+         *  06/03/93 - 2.28   Add correction for 72 '-' within a note text    *
+         *                                                                    *
+         *  06/02/93 - 2.27   Add verification for profs invalid files        *
+         *                    date stamp.                                     *
+         *                                                                    *
+         *  06/01/93 - 2.26   Add MF (Merge Force) option                     *
+         *                    Add DF (Delete File) option                     *
+         *                                                                    *
+         *  04/27/93 - 2.25   Fix prof_pause bug                              *
+         *                                                                    *
+         *  04/19/93 - 2.24   Add TMAILQRY test for inboung mail              *
+         *                                                                    *
+         *  03/23/93 - 2.23   Fix mail forward flag processing.               *
+         *                                                                    *
+         *  02/10/93 - 2.22   Pre-allocate log if not already allocated to    *
+         *                    increase the default allocation size.           *
+         *                                                                    *
+         *  02/05/93 - 2.21   Update Mail Forward flag options                *
+         *                                                                    *
+         *  01/14/93 - 2.20   Improve file delete option and fix from         *
+         *                    Bill Horton (Eastman Chemical)                  *
+         *                                                                    *
+         *  12/08/92 - 2.18   Limit size of invalid.file's processed for mail *
+         *                                                                    *
+         *  12/06/92 - 2.17   fix for :msg with invalid.file                  *
+         *                                                                    *
+         *  12/04/92 - 2.16   Fix for receive.invalid.file                    *
+         *                                                                    *
+         *  11/25/92 - 2.15   Correction for minus scrolling                  *
+         *                                                                    *
+         *  11/24/92 - 2.14   Add ACK: for subject for 2.13 change            *
+         *                                                                    *
+         *  11/05/92 - 2.13   Add code to handle X.RECEIVE.INVALID.FILE       *
+         *                    messages                                        *
+         *                                                                    *
+         *  10/06/92 - 2.12   Correct RFIND and current row location          *
+         *                                                                    *
+         *  10/02/92 - 2.10   Correct SMTP to userid/node                     *
+         *                                                                    *
+         *  09/26/92 - 2.09   fix length test of acknowledgement              *
+         *                                                                    *
+         *  09/25/92 - 2.07/8 add panel TMAILNTW when copying table           *
+         *                                                                    *
+         *  09/24/92 - 2.06: Bug fix                                          *
+         *                                                                    *
+         *  09/24/92 - 2.05: Minor correction for incoming dsn's              *
+         *                                                                    *
+         *  09/16/92 - 2.04: Refinement of 2.03                               *
+         *                                                                    *
+         *  09/01/92 - 2.03: Fix error of lost messages if data deleted       *
+         *                   via manual receive command.                      *
+         *                                                                    *
+         *  06/16/92 - 2.02: Bug fix on SMTP name                             *
+         *                                                                    *
+         *  05/27/92 - 2.01: Add support for SMTP From: information           *
+         *                   to support Answer and Forward *                  *
+         *                                                                    *
+         *  05/06/92 - 2.00: Changed to version 2.0 to reset level            *
+         *                   Set default REXX address to ISPEXEC              *
+         *                   Several minor performance enhancements           *
+         *                                                                    *
+         *  11/10/89 - creation of this application                           *
+         *                                                                    *
+         * ------------------------------------------------------------------ *
+         * Author:    Lionel B. Dyck                                          *
+         *            Kaiser Permanente Information Technology                *
+         *            25 N. Via Monte Ave.                                    *
+         *            Walnut Creek, CA 94598                                  *
+         *            (925) 926-5332                                          *
+         *            Internet: lionel.b.dyck@kp.org                          *
+         * ------------------------------------------------------------------ */
+        arg options
+
+        if "ACTIVE" = sysvar('sysispf') then do
+           Address ISPEXEC
+           "VGET ZAPPLID"
+
+           cmd = sysvar('sysicmd')
+
+           if zapplid <> "MAIL" then do
+           "SELECT CMD(%"cmd options") NEWAPPL(MAIL)"
+           exit
+           end
+        end
+
+        start:
+
+        parse value "" with debug safe read check batch nodel debug_dd null
+
+        /* -------------------------------------------------- *
+         * Blksize for table and data set allocations         *
+         * Set to "0" for System Determined Blksize or        *
+         * if SDB is not enabled set to:                      *
+         * FB_Blksize="23440"                                 *
+         * VB_Blksize="23476"                                 *
+         * -------------------------------------------------- */
+        FB_Blksize = "0"
+        VB_Blksize = "0"
+
+        if wordpos("DEBUG",options,1) > 0 then do
+                          trace i
+                          debug = "DEBUG"
+                          end
+
+        if wordpos("SAFE",options,1) > 0 then do
+                 safe = "on"
+                 batch = "on"
+                 end
+
+        if wordpos("READ",options,1) > 0 then
+                 read = "on"
+
+        if wordpos("NOMSG",options,1) > 0 then
+                 check = "on"
+
+        if wordpos("BATCH",options,1) > 0 then
+                 batch = "on"
+
+        if wordpos("NODEL",options,1) > 0 then
+                 nodel = "on"
+
+        if wordpos("LOG",options,1) > 0 then do
+                 log_opt = "on"
+                 end
+                 else log_opt = "off"
+
+         parse upper var options "USERID(" user ")" .
+         parmw = strip(user,,"'")
+         parm = "PARM("user")"
+
+         if length(user) > 0 then do
+                                  userid = user
+                                  prefix = user
+                                 end
+                            else do
+                              userid = sysvar('sysuid')
+                              prefix = sysvar('syspref')
+                              end
+
+        /* set message data set without table suffix  *
+         * for compatability with previous tsomail    *
+         * messages.                                  */
+        message_ds =  prefix".TSOMAIL.MESSAGE"
+        message_ds_l = length(message_ds)
+
+        /* now add the suffix for the message table data set */
+        message_ds = message_ds".TABLE"
+
+        message_ods =  "'"prefix".TSOMAIL.MESSAGE.TABLEO'"
+        message_nds =  "'"prefix".TSOMAIL.MESSAGE.TABLEN'"
+        mail_dd = "MAIL"random()
+
+        Address ISPEXEC "Vget Sendctr"
+        center = sendctr
+
+        if log_opt    = "off" then do
+           table      = "'"prefix".TSOMAIL.TABLE'"
+           tablet     =    prefix".TSOMAIL.TABLE"
+           ntable     = "'"prefix".TSOMAIL.NTABLE'"
+           otable     = "'"prefix".TSOMAIL.OTABLE'"
+           mailtbl    = "TSOMAIL"
+           tblpanel   = "TMAILTBL"
+           end
+        else do
+             "Vget (table tablet ispftbl maillog)"
+             mailtbl = ispftbl
+             read = "on"
+             tblpanel = "TMLOGTBL"
+             end
+
+        months = "JAN FEB MAR APR MAY JUN JUL ",
+                 "AUG SEP OCT NOV DEC"
+        table_log = "'"prefix".TSOMAIL.TABLE'"
+        middle    = "LOG"
+        suffix    = "MISC"
+        logsel    = null
+        logname   = null
+
+        if log_opt = "on" then do
+           rcount  = 0
+           newmail = "off"
+           call listdsi table 'norecall  directory'
+           table_status = sysreason + 0 /* remove leading 0's) */
+           signal do_table
+           end
+
+        /* ---------------------------------------------------- *
+         * Determine if there is a prefix.NAMES.TEXT and if so: *
+         * 1.  Open it and read it                              *
+         * 2.  Determine if the user has specified either       *
+         *     :logsel.  or  :logname.                          *
+         *     (:logsel. is the middle qualifier)               *
+         *     (:logname. is the suffix)                        *
+         * 3.  Use the specified log name if found              *
+         * 4.  Otherwise use prefix.LOG.MISC                    *
+         * ---------------------------------------------------- */
+
+        dash = insert('-','-',1,79,'-')
+
+        names = "'"prefix".NAMES.TEXT'"
+
+        x = listdsi(names)
+        nts = sysreason
+        nts_dd = "LOG"random()
+
+        if nts = 0 then do
+          Address TSO
+          "ALLOC FILE("nts_dd") DS("names") SHR"
+          "EXECIO * DISKR" nts_dd "(FINIS STEM nt."
+          Address ISPEXEC
+          do i = 1 to nt.0
+             upper nt.i
+             x = pos(':LOGSEL.',nt.i)
+             if x > 0 then do
+                p = substr(nt.i,x,40)
+                parse var p w1 w2
+                l = wordlength(w1,1)
+                middle_name = substr(nt.i,x+8,l-8)
+                if length(middle_name) > 0 then do
+                   logsel = "on"
+                   middle = middle_name
+                   end
+                if logname = "on" then i = nt.0
+                end
+             x = pos(':LOGNAME.',nt.i)
+             if x > 0 then do
+                p = substr(nt.i,x,40)
+                parse var p w1 w2
+                l = wordlength(w1,1)
+                suffix_name = substr(nt.i,x+9,l-9)
+                if length(suffix_name) > 0 then do
+                   logname = "on"
+                   suffix = suffix_name
+                   end
+                if logsel = "on" then i = nt.0
+                end
+           end  /* end loop for logsel and logname */
+        end /* end ok loop */
+
+        if nts = 0 then Address TSO "FREE FILE("nts_dd")"
+
+        maildsn   ="'"prefix"."middle"."suffix"'"
+
+        /* set the julian date  */
+        d = date(u)
+        date = substr(d,7,2)substr(d,1,2)substr(d,4,2)
+
+        s = time("L")  /* get the current time hh:mm:ss.th */
+        t = substr(s,1,2)substr(s,4,2)substr(s,7,2)substr(s,10,1)
+        debug_dsn = "'"prefix".TSOMAIL.D"date".T"t".DEBUG'"
+
+        /* ---------------------------------------------------- *
+         * Test to see if the tsomail table data set exists     *
+         * and bypass this code if it does.                     *
+         *                                                      *
+         * Bypass if SAFE process is occuring                   *
+         *                                                      *
+         * Then test if a current tso log data set exists       *
+         *                                                      *
+         * If it does then prompt the user to:                  *
+         *     - delete the current tso log data set            *
+         * or  - edit it to remove old/unwanted messages        *
+         * ---------------------------------------------------- */
+
+        log_ds_stat = sysdsn(maildsn)
+
+        if safe <> "on" then do
+           call listdsi table 'norecall  directory'
+           table_status = sysreason + 0 /* remove leading 0's) */
+           /* does the table exist */
+           if wordpos(table_status,"0 9 25") = 0 then do
+              if log_ds_stat = "OK" then do
+                 /* there currently exists a log data set */
+                 "DISPLAY PANEL(TMAILTLG)"
+                 if zcmd = "D" then
+                    Address TSO "DELETE" maildsn
+                 if zcmd = "E" then,
+                    "EDIT DATASET("maildsn")"
+               end
+            end
+        end
+
+       if safe <> "on" then do
+   /*      Address TSO,
+              "Tmailqry"
+           new_rc = rc
+           if new_rc > 0  then do
+              read = "on"
+              signal do_table
+              end  */
+           end
+
+        if log_ds_stat <> "OK" then do
+           Address TSO
+             "Alloc ds("maildsn") New Spa(15,30) Tr",
+               "Recfm(V B) Lrecl(255) Blksize(3120) Dsorg(PS)"
+             "Free  ds("maildsn")"
+           Address ISPEXEC
+           end
+
+        rcount = 0       /* receive counter       */
+        newmail = "off"  /* set initial value off */
+        check_cnt = 0    /* warning counter       */
+
+        if read = "on" then signal do_table
+
+        if safe <> "on" then
+           if batch = "on" then signal do_table
+
+        x = OUTTRAP("profile.",'*')
+
+        Address TSO "PROFILE"
+
+        if pos('NOMSGID',profile.1) = 0 then msg = "MSGID"
+                                         else msg = NOMSGID
+
+        if pos('NOINTERCOM',profile.1) = 0
+                       then intercom = "INTERCOM"
+                       else intercom = "NOINTERCOM"
+
+        if pos('NOWTPMSG',profile.1) = 0
+                       then wtpmsg = "WTPMSG"
+                       else wtpmsg = "NOWTPMSG"
+
+        if pos('NOPAUSE',profile.1) = 0
+                       then prof_pause = "PAUSE"
+                       else prof_pause = "NOPAUSE"
+
+        x = OUTTRAP('OFF')
+
+        /*    end of profile testing for the message id option   */
+
+        /* set first pass flag */
+        first = "on"
+
+        if safe <> "on" then do
+           Address TSO
+            debug_dd = "DBG"random()
+            if "OK" <> sysdsn(debug_dsn) then do
+              "Alloc f("debug_dd") ds("debug_dsn") New Spa(15,30)",
+                 "Tr Recfm(V B) Lrecl(255) Blksize(3120) Dsorg(PS)"
+              "Free  f("debug_dd")"
+              end
+            "Alloc f("debug_dd") ds("debug_dsn") Mod "
+           Address ISPEXEC
+        end
+
+        Signal Receive
+
+        Again:
+
+        /* reset the message profile option */
+        x = OUTTRAP("p.",'*')
+        Address TSO "PROFILE" msg
+        x = OUTTRAP('OFF')
+
+        parse value null with rec_del do_receive
+
+        /* -------------------------------------------------------- *
+         *                                                          *
+         *   Loop thru the captured output looking for INMR906A     *
+         *   which will indicate that we need to receive a data set.*
+         *                                                          *
+         *   Update check_cnt for each INMR906A, if 2 or > stop     *
+         *   receive and issue warning.                             *
+         *                                                          *
+         *   If INMR001I then reset check_cnt                       *
+         *                                                          *
+         *   If found then generate a unique data set name based on *
+         *   prefix.TSOMAIL.Ddate.Ttime.DATA                        *
+         *                                                          *
+         *   If INMR060I is found then queue a DELETE as we can't   *
+         *   handle that data set.                                  *
+         *                                                          *
+         *   Then branch to the Receive subroutine.                 *
+         *                                                          *
+         *   Also reply DELETE for message INMR933A....             *
+         *   Also reply Dsname for message INMR907A....             *
+         *                                                          *
+         * -------------------------------------------------------- */
+
+        if safe <> "on" then
+           Address TSO,
+              "Execio * diskw" debug_dd "(Finis Stem output."
+
+        do i = 1 to output.0
+
+        if "INMR003I" == substr(output.i,1,8) then
+           signal do_table
+
+        inmr_msg = substr(output.i,1,8)
+
+        if wordpos(inmr_msg,"INMR060I INMR108I INMR933A") > 0
+            then do
+            rec_del = "DELETE"
+            log_dd = "LOG"random()
+            e_m.1 = dash
+            e_m.2 = "ERROR during Receive"
+            Address TSO
+            "ALLOC F("log_dd") MOD DS("maildsn")"
+            "EXECIO 2 DISKW" log_dd "(FINIS STEM e_m."
+            "EXECIO" output.0 "DISKW" log_dd "(FINIS STEM output."
+            "FREE F("log_dd")"
+            Address ISPEXEC
+            dataset = null
+            do_receive = "on"
+            end
+
+        if "INMR907A" == substr(output.i,1,8) then do
+            s = time("L")  /* get the current time hh:mm:ss.th */
+            t = substr(s,1,2)substr(s,4,2)substr(s,7,2)substr(s,10,1)
+            rdsn = "DATASET('"prefix".TSOMAIL.D"date".T"t".DATA')"
+            dataset = "receive"
+            newmail = "on"  /* set the new mail flag on */
+            do_receive = "on"
+            end
+
+        if "INMR001I" = left(output.i,8) then
+            check_cnt = 0
+
+        if "INMR000I" = left(output.i,8) then
+            check_cnt = 0
+
+        if "INMR906A" = left(output.i,8) then do
+            s = time("L")  /* get the current time hh:mm:ss.th */
+            t = substr(s,1,2)substr(s,4,2)substr(s,7,2)substr(s,10,1)
+            rdsn = "DATASET('"prefix".TSOMAIL.D"date".T"t".DATA')"
+            dataset = "receive"
+            newmail = "on"  /* set the new mail flag on */
+            do_receive = "on"
+            check_cnt = check_cnt + 1
+            if check_cnt > 2 then do
+               Mailsmsg = "Error"
+               Maillmsg = "An error with RECEIVE may have been encountered,",
+                          "contact Systems Support."
+              if batch <> "on" then "SETMSG MSG(MAIL000)"
+                 else say "*****" maillmsg "*****"
+                      if prof_change = "on" then
+                       Address TSO,
+                        "PROFILE" intercom wtpmsg prof_pause
+                 exit 8
+            end
+        end
+
+        end       /* end do loop for output trapped */
+
+        if do_receive = "on" then signal receive
+
+        if length(debug_dd) > 0 then
+           Address TSO "Free F("debug_dd")"
+
+        signal do_table
+        exit
+
+        Receive:
+
+        /* set the profile envionment for our needs */
+        x = OUTTRAP("p.",'*')
+        Address TSO "PROFILE MSGID NOINTERCOM NOWTPMSG NOPAUSE"
+        prof_change = "on"
+        x = OUTTRAP('OFF')
+
+        Address TSO "DELSTACK"
+        Address TSO "DELSTACK"
+
+        x = PROMPT("ON") /* enable prompting */
+        x = MSG("ON")    /* turn messages on */
+
+        if first = "on" then do
+           queue 'END'  /* stack an END record */
+           first = "off"
+           end
+
+        /* -------------------------------------------------------- *
+         * Check for rec_del and queue out "DELETE" if non-blank    *
+         * as we can't handle that data set                         *
+         * -------------------------------------------------------- */
+         if rec_del = "DELETE" then queue "DELETE"
+
+        /* -------------------------------------------------------- *
+         *   Queue out the TSO RECEIVE response to indicate the     *
+         *   data set name to be used to receive the first          *
+         *   data set in the stack.  The SYSOUT(0) is used to       *
+         *   direct the IEBCOPY messages to a sysout class that     *
+         *   is defined as copies=0 as we do not want to see them   *
+         *   and there is no other way to keep them from the screen *
+         * -------------------------------------------------------- */
+
+        if dataset = "receive" then do
+           queue rdsn "SYSOUT(0)"   /* queue out the dsn to receive into */
+           queue 'END'  /* stack an END record */
+           dataset = null
+           end
+
+        rcount = rcount + 1
+
+        if "ACTIVE" = sysvar('sysispf') then do
+           if safe <> "on" & check <> "on" & batch <> "on" then do
+           "CONTROL DISPLAY LOCK"
+           "DISPLAY PANEL(TMAILRW)"                  /* RECEIVE Wait Panel */
+           end
+        end
+
+        /* clean up the output variable */
+        drop output.
+
+        x = OUTTRAP("output.",'*')
+
+        if "USERID" <> userid then
+           Address TSO,
+           "RECEIVE USERID("userid") LOGDSNAME("maildsn")"
+            else
+            Address TSO,
+            "RECEIVE LOGDSNAME("maildsn")"
+
+        receive_rc = rc
+        if receive_rc < -50 then signal do_table
+
+        x = OUTTRAP('OFF')
+
+        if p == on then x = PROMPT("OFF")
+        x = MSG("OFF")   /* turn off messages for now */
+
+        Address TSO "DELSTACK"
+        Address TSO "DELSTACK"
+
+        Signal again  /* continue with the process */
+
+        do_table:
+
+        if "ACTIVE" <> sysvar('sysispf') then exit  /* exit if not under ISPF */
+
+        if read = "on" then maildsn = null
+
+        last_sort = "FROMUSER"
+        mcount = 0   /* initialize the message count received value */
+        fcount = 0   /* initialize the message files received value */
+
+
+        Select
+            when table_status = 0 then nop
+            when wordpos(table_status,"9 25",) > 0 then do
+               Address ISPEXEC "Display Panel(TMAILRCL)"
+               if rc > 4 then exit
+               x = outtrap("del.","*")
+               Address TSO "HRecall" table "Wait"
+               x = outtrap("off")
+               end
+            otherwise do
+               Address TSO,
+               "ALLOC DS("table") NEW DIR(60) SPACE(30,90) TRACKS",
+               "Dsorg(PO) RECFM(F B) LRECL(80) BLKSIZE("FB_Blksize")"
+               end
+        end
+
+        call listdsi table 'directory'
+        if sysextents > 10 then newtable = "yes"
+        if (sysadirblk-sysudirblk) < 5 then do
+           newtable = "yes"
+           sysadirblk = sysadirblk + 15
+           end
+
+        if newtable == "yes" then do
+           if batch <> "on" & check <> "on" then do
+             members = sysmembers
+             "CONTROL DISPLAY LOCK"
+             "DISPLAY PANEL(TMAILNTW)"
+             end
+          x = msg("OFF")
+          Address TSO,
+           "Delete" ntable
+          Address TSO,
+           "ALLOC DS("ntable") NEW DIR("sysadirblk")",
+           "SPACE("sysalloc",90) TRACKS DSORG(PO)",
+           "RECFM(F B) LRECL(80) BLKSIZE("FB_Blksize")"
+           "LMINIT DATAID(tblin) DATASET("table")"
+           "LMINIT DATAID(tblout) DATASET("ntable")"
+           "LMCopy FROMID("tblin")",
+                  "TODATAID("tblout") FROMMEM(*)"
+           "LMFREE Dataid("tblin")"
+           "LMFREE Dataid("tblout")"
+           Address TSO "DELETE" otable
+           Address TSO "RENAME" table  otable
+           Address TSO "RENAME" ntable table
+           newtable = null
+           end
+
+        if length(maildsn) > 0 then do
+           if new_rc > 0 then leave
+           if batch <> "on" & check <> "on" then do
+           "CONTROL DISPLAY LOCK"
+           "DISPLAY PANEL(TMAILWAT)"
+           end
+        end
+
+        "LIBDEF" mailtbl "DATASET ID("table")"
+
+        "CONTROL ERRORS RETURN"
+        "TBOPEN "mailtbl" WRITE LIBRARY("mailtbl")"
+          lcc = rc  /* save the return code */
+          zsel = null
+          if lcc == 0 then mailnum = 0
+
+        if lcc == 12 then do
+           mailsmsg = 'In use'
+           maillmsg = 'The TSO Mail Table is currently in use',
+                      'probably is a split session '
+           if batch <> "on" then "DISPLAY PANEL(TMAILUSE)"
+              else say "*****" maillmsg "*****"
+            "TBEND "mailtbl
+            "LIBDEF "mailtbl
+           /* reset the profile environment back to normal */
+           if prof_change = "on" then call reset_profile
+           exit
+        end
+
+        if lcc > 12 then do
+           mailsmsg = 'Severe Error'
+           maillmsg = 'A Severe Error has been encountered - ',
+                'contact systems support'
+           if batch <> "on" then "SETMSG MSG(MAIL000)"
+              else say "*****" maillmsg "*****"
+           exit
+           /* reset the profile environment back to normal */
+           if prof_change = "on" then
+           if prof_change = "on" then call reset_profile
+            "TBEND "mailtbl
+            "LIBDEF "mailtbl
+        end
+
+        if lcc == 8 then do
+           "TBCREATE "mailtbl" KEYS(MAILNUM)",
+           "NAMES(MAILFLOC MAILFID MAILTLOC MAILTID MAILDATN MAILDATD",
+           "MAILTIME MAILACTN MAILSUBJ MAILFDS MAILTDS)",
+           "LIBRARY("mailtbl") WRITE"
+
+            mailnum = 0
+            end
+
+        build:
+        x = listdsi(maildsn)
+
+        if sysreason = 0 & sysused > 0 then do
+          Address TSO
+           "ALLOC FILE("mail_dd") DS("maildsn") SHR"
+           "EXECIO * DISKR "mail_dd" (FINIS STEM data."
+           "FREE FILE("mail_dd")"
+           Address ISPEXEC
+           msgcount = 0
+           parse value null with type mailsubj mailsmtp long_message mailfloc,
+           msgl.0 = 4
+           msgl.1 = "Message exceeding 80 characters received"
+           msgl.2 = "and has been placed into a data set."
+           msgl.3 = " "
+           msgl.4 = " "
+
+        buildtbl:
+        do i = 1 to data.0
+
+        /* test for start of message indicator of 79 '-' */
+
+        if substr(dash,1,79) = substr(data.i,1,79) then do
+           i = i + 1
+           if wordpos(word(data.i,1),"ERROR TRANSMIT RECEIVE") > 0 then
+              hit = 1
+              else do
+                   hit = 0
+                   i = i - 1
+                   end
+        end
+
+        if hit = 1 then do
+              hit = 0
+              if msgcount > 0 then do
+                              call store_msg
+                              end
+                              else do
+                                parse value null with mailsubj mailfds,
+                                               msg. mailtds type mailsmtp
+                              end
+              end
+
+        if "ERROR " == substr(data.i,1,6) & length(type) = 0 then do
+           type = "M"
+           mailsubj = "Data Set Reception Error"
+           mailactn = "Received"
+           end
+
+        if "TRANSMIT" == substr(data.i,1,8) & length(type) = 0 then do
+           type = "M"
+           if "** MESSAGE " = substr(data.i,17,11),
+              & "**MESSAGE**" = substr(data.i,17,11) then do
+                msg.1 = data.i
+                call toinfo1
+                i = i + 1
+                msgword = 1
+                call toinfo2
+                mailactn = "Sent"
+                end
+           else do  /* must be a sent file */
+               msg.1 = data.i
+               mailsubj = "Sent file:" substr(data.i,17,44)
+               call toinfo1
+               i = i + 1
+               msgcount = 1
+               call toinfo2
+               mailactn = "Sent"
+               end
+        end
+
+        if "RECEIVE" == substr(data.i,1,7) & length(type) = 0 then do
+           if "** MESSAGE **" = substr(data.i,17,13) then do
+              type = "M"
+              newmail = "on"  /* set the new mail flag on */
+              mailactn = "Received"
+              parse value null with mailsubj mailfds mailfloc
+              call finfo1
+              end
+
+           if "** ACKNOWLEDGMENT **" = substr(data.i,17,21) then do
+              parse value null with mailfds mailfloc
+              mailsubj = "Acknowledgement"
+              mailactn = "Received"
+              type = "M"
+              call finfo1
+              end
+
+        if type = null then do
+          type = "F"
+             mailactn = "Received"
+             newmail = "on"  /* set the new mail flag on */
+             mailsubj = "Original DSN:" substr(data.i,17,44)
+             mailfds  = substr(data.i,17,44)
+             call finfo1
+             parse value "???? ???? ???? ????" with,
+                   mailfloc mailfid mailtid mailtloc
+        end
+
+        end    /*  end of RECEIVE processing  */
+
+        if type = "M" then do
+           if substr(data.i,2,6) == "FROM: " then
+              if length(mailfloc) = 0 then
+                  call finfo2
+              x = i + 1
+              if word(data.x,1) = "STORED" then long_message = "off"
+           end
+
+        if type = "F" then do
+           if substr(data.i,2,6) == "FROM: " then do
+              call finfo2
+              end
+           if substr(data.i,5,5) == "DSN: " then do
+              mailtds = substr(data.i,10,44)
+              mailtds = "'"strip(mailtds)"'"
+              type = "D"
+              fcount = fcount + 1
+              end
+           else do
+              msgcount = msgcount + 1
+              msg.msgcount = data.i
+              if type = "D" then call store_msg
+              end
+        end
+
+        if type = "M" then do
+           if length(mailsubj) = 0 then do
+              x = pos("SUBJECT:",data.i)
+           if x = 0 then x = pos("Subject:",data.i)
+           if x > 0 then
+              mailsubj = "Message:" substr(data.i,x+9,70)
+           end
+              x = 0
+              if left(data.i,6) = "From: " then x = 1
+              if left(data.i,9) = "Reply-To:" then x = 2
+              if left(data.i,8) = "rcpt to:" then x = 3
+              select
+                when x = 1 then do
+                   x = pos("<",data.i)
+                   if x = 0
+                      then parse value data.i with "From: " work .
+                      else parse value data.i with "<" work ">"
+                      if mailsmtp = null then mailsmtp = work
+                   end
+                when x = 2 then do
+                   x = pos("<",data.i)
+                   if x = 0 then
+                      parse value data.i with "Reply-To: " work .
+                      else parse value data.i with "<" work ">"
+                   mailsmtp = work
+                   end
+                when x = 3 then do
+                   x = pos("<",data.i)
+                   if x = 0 then
+                      parse value data.i with "rcpt to: " work .
+                      else parse value data.i with "<" work ">"
+                      if mailsmtp = null then mailsmtp = work
+                   end
+                 otherwise nop;
+           end
+
+           msgcount = msgcount + 1
+           msg.msgcount = data.i
+           if long_message = null then
+              if msgcount > 2 then
+                 if length(msg.msgcount) > 80 then long_message = "on"
+        end  /* end of do for type = "M" */
+
+          end  /* end do to process recently received mail */
+
+          if msgcount > 0 then call store_msg
+        end     /* end of the build process */
+
+        drop data.
+
+        if length(maildsn) > 0 then do
+        if mcount = 0 then do
+           x = outtrap("del.","*")
+           Address TSO "DELETE" maildsn
+           x = outtrap("off")
+           mailsmsg = '0 New Messages'
+           maillmsg = 'There were no new messages or files to ',
+               'receive at this time'
+           if batch <> "on" then do
+                  if check <> "on" then
+                  "SETMSG MSG(MAIL000)"
+                  end
+              else say "*****" maillmsg "*****"
+           end
+        if mcount > 0 then do
+            mailsmsg = mcount 'New Messages'
+            maillmsg =,
+            'There were' mcount 'new messages including' fcount 'files received'
+            if batch <> "on" then do
+                  if check <> "on" & newmail = "on" then
+                     "SETMSG MSG(MAIL000)"
+                     end
+               else say "*****" maillmsg "*****"
+            end
+            x = MSG("OFF")
+            "Vget (tmdel) Profile"
+            if tmdel = "Y" then nodel = "on"
+            if nodel <> "on" then do
+               Address TSO "Delete" maildsn
+               Address TSO "Delete" debug_dsn
+               end
+            else do
+               Address TSO
+               "DELETE '"prefix"."middle".HOLD3."suffix"'"
+               "RENAME '"prefix"."middle".HOLD2."suffix"'",
+                       "'"prefix"."middle".HOLD3."suffix"'"
+               "RENAME '"prefix"."middle".HOLD1."suffix"'",
+                       "'"prefix"."middle".HOLD2."suffix"'"
+               "RENAME"  maildsn  "'"prefix"."middle".HOLD1."suffix"'"
+
+               "DELETE '"prefix"."middle".HOLD3.debug'"
+               "RENAME '"prefix"."middle".HOLD2.debug'",
+                       "'"prefix"."middle".HOLD3.debug'"
+               "RENAME '"prefix"."middle".HOLD1.debug'",
+                       "'"prefix"."middle".HOLD2.debug'"
+               "RENAME"  debug_dsn  "'"prefix"."middle".HOLD1.debug'"
+               Address ISPEXEC
+               end   /* end rename for NODEL option */
+        end  /* end do for length(maildsn) > 0 */
+
+        if check = "on" then do
+                   if mcount = 0 then batch = "on"
+                   if newmail = "off" then batch = "on"
+                   end
+
+        /* reset the profile environment back to normal */
+        if read <> "on" then
+           if prof_change = "on" then call reset_profile
+
+        if batch = "on" then do
+              "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+              "TBCLOSE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+              x = msg('off')
+              if tsomnum_alloc = "on" then do
+                Address TSO  "Free F("tsomnum")"
+                drop tsomnum_alloc
+                end
+              x = msg('on')
+              "LIBDEF "mailtbl
+              exit
+              end
+
+        /* ----------------------------------------------------- *
+         * Test for y2k date in maildatn and fix if not          */
+        "TBBottom" mailtbl
+        if length(maildatn) = 6 then do
+           "tbquery" mailtbl "rownum(rows)"
+           "tbtop" mailtbl
+           do i = 1 to rows
+              "TBSkip" mailtbl
+              if length(maildatn) = 6 then do
+                 maildatn = "19"maildatn
+                 parse value maildatd with month "/" day "/" year
+                 if length(year) = 2 then
+                    if year > 10
+                       then year = 1900 + year
+                       else year = 2000 + year
+                 maildatd = month"/"day"/"year
+                 "TBMod" mailtbl
+                 end
+              end
+           end
+
+        /* ----------------------------------------------------- *
+         * Now resume processing normally                        */
+        "TBTOP" mailtbl
+        "TBSAVE" mailtbl "REPLCOPY LIBRARY("mailtbl")"
+        "TBSORT" mailtbl "FIELDS (MAILNUM C,D)"
+
+        "VGET (MAILDISP)"
+          if log_opt = "off" then do
+             select
+                when maildisp = "LONG"   then tblpanel = "TMAILTBL"
+                when maildisp = "SHORT"  then tblpanel = "TMAILTBS"
+                when maildisp = "XLONG"  then tblpanel = "TMAILTBX"
+                otherwise tblpanel = "TMAILTBL"
+                end
+             end
+             else do
+             select
+                when maildisp = "LONG"   then tblpanel = "TMLOGTBL"
+                when maildisp = "SHORT"  then tblpanel = "TMLOGTBS"
+                when maildisp = "XLONG"  then tblpanel = "TMLOGTBX"
+                otherwise tblpanel = "TMLOGTBL"
+                end
+             end
+
+        parse value '0 0 0' with crp rowcrp last_find
+        parse value null with save_zverb save_zscrolln
+
+        "Control Errors Return"
+        "vput (mailtbl) shared"
+
+        display:
+        do forever
+
+        parse value null with zcmd mailsmsg maillmsg zsel
+
+        usrfind = "PASSTHRU"
+        "VPUT USRFIND"
+
+        if ispfds = "on" then do
+           "CONTROL DISPLAY RESTORE"
+           ispfds = "off"
+           end
+
+        "VGET (ZVERB ZSCROLLN)"
+
+        if save_zverb <> null then do
+           zverb = save_zverb
+           zscrolln = save_zscrolln
+           parse value null with save_zverb save_zscrolln
+           end
+
+        if hcc == 4 then "TBDISPL "mailtbl
+           else do
+                "TBTOP" mailtbl
+                "TBSKIP" mailtbl "NUMBER("crp")"
+                if zscrolln <> null then do
+                  if zverb = "UP" then "TBSkip" mailtbl "Number(-"zscrolln")"
+                  if zverb = "DOWN" then
+                     "TBSkip" mailtbl "Number("zscrolln")"
+                  end
+                if rowcrp = 0 then
+                  "TBDISPL "mailtbl" PANEL("tblpanel")"
+                else
+                "TBDISPL "mailtbl" PANEL("tblpanel")",
+                        "CSRROW("rowcrp") AUTOSEL(NO)"
+                end
+
+        crp = ztdtop
+        rowcrp = 0
+
+        hcc = rc  /* save return code */
+
+        "VGET (ZVERB ZSCROLLN)"
+        if wordpos(zverb,"UP DOWN") > 0 then do
+           save_zverb = zverb
+           save_zscrolln = zscrolln
+           end
+           else parse value null with save_zverb save_zscrolln
+
+        usrfind = null
+        "VPUT USRFIND"
+
+        ispfds = "off"
+
+        if hcc > 4 then do
+              "TBCLOSE" mailtbl "REPLCOPY LIBRARY("mailtbl")"
+              "LIBDEF" mailtbl
+              x = msg('off')
+              if tsomnum_alloc = "on" then do
+                Address TSO "Free F("tsomnum")"
+                drop tsomnum_alloc
+                end
+              x = msg('on')
+             if log_opt = "on" then do
+                mailsmsg = 'Complete'
+                maillmsg = 'ISPF TSO Mail Log Processing Complete'
+                                    end
+                else do
+                     mailsmsg = 'Complete'
+                     maillmsg = 'ISPF TSO Mail Dialog Processing Complete'
+                     end
+             "SETMSG MSG(MAIL000)"
+             exit 0
+             end
+
+        if ztdsels = 0 & length(zcmd) = 0 then signal display
+
+        rowcrp = 0
+
+        if zsel <> null then
+           "TBQUERY "mailtbl,
+                  "POSITION(ROWCRP)"
+
+        if ztdsels > 0 & zsel = null then do
+           "TBQUERY "mailtbl,
+                  "POSITION(ROWCRP)"
+                  crp = crp + rowcrp - 1
+                  rowcrp = 1
+                  end
+
+        if length(zcmd) > 0 then do
+           parse value zcmd with w1 w2 w3
+           upper w1
+
+           select
+
+           when abbrev('SHORT',w1,2) then do
+              maildisp = "SHORT"
+              if log_opt = "off" then tblpanel = "TMAILTBS"
+                                 else tblpanel = "TMLOGTBS"
+              hcc = 0
+              "VPUT (MAILDISP) PROFILE"
+              end
+
+           when abbrev('LONG',w1,3) then do
+              maildisp = "LONG"
+              if log_opt = "off" then tblpanel = "TMAILTBL"
+                                 else tblpanel = "TMLOGTBL"
+              hcc = 0
+              "VPUT (MAILDISP) PROFILE"
+              end
+
+           when abbrev('XLONG',w1,2) then do
+              maildisp = "XLONG"
+              if log_opt = "off" then tblpanel = "TMAILTBX"
+                                 else tblpanel = "TMLOGTBX"
+              hcc = 0
+              "VPUT (MAILDISP) PROFILE"
+              end
+
+           when abbrev('SENDMAIL',w1,4) then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+                sendsubj = null
+                "VPUT (SENDSUBJ) SHARED"
+                "SELECT CMD(%TMAILSND" w2 w3 debug")"
+                end
+
+           when abbrev('DEFAULTS',w1,3) then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+                if log_opt = "on" then do
+                   mailsmsg = "Error"
+                   maillmsg = "Option DEFAULTS is not supported when",
+                               " processing a Mail LOG."
+                   end
+                else do
+                     "SELECT CMD(%TMAILDEF)"
+                     end
+                end
+
+           when abbrev('DEBUG',w1,3) then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+                if length(w2) = 0 then do
+                                  trace i
+                                  debug = "DEBUG"
+                                  end
+                   else do
+                        trace off
+                        debug = null
+                        end
+                   end
+
+           when w1 = "LOG"  then do
+                if log_opt = "on" then do
+                   mailsmsg = "Error"
+                   maillmsg = "Option LOG is not supported when processing",
+                              " a Mail LOG."
+                   end
+                else do
+                     "TBCLOSE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+                     x = msg('off')
+                     if tsomnum_alloc = "on" then do
+                       Address TSO "Free F("tsomnum")"
+                       drop tsomnum_alloc
+                       end
+                     x = msg('on')
+                     "LIBDEF "mailtbl
+                     if ispfds = "on" then
+                        "CONTROL DISPLAY RESTORE"
+                     "Select CMD(%TMAILLOG)"
+                     read = "on"
+                     signal do_table
+                     end
+                end
+
+           when abbrev('REFRESH',w1,3) then do
+                if log_opt = "on" then do
+                   mailsmsg = "Error"
+                   maillmsg = "Option REFRESH is not supported when processing",
+                               " a Mail LOG."
+                   end
+                else do
+              /*  Address TSO "Tmailqry"
+                  n_rc = rc */
+                  n_rc = 0
+                  if n_rc = 0 then do
+                     "TBCLOSE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+                     x = msg('off')
+                     if tsomnum_alloc = "on" then do
+                       Address TSO "Free F("tsomnum")"
+                       drop tsomnum_alloc
+                       end
+                     x = msg('on')
+                     "LIBDEF "mailtbl
+                     y = wordpos("READ",options)
+                     if y > 0 then do
+                                   xopt = delword(options,y,4)
+                                   options = xopt
+                                   end
+                     signal start
+                     end
+                  if n_rc > 0 then do
+                     mailsmsg = "No New Mail"
+                     maillmsg = "No new mail to receive.  Refresh terminated."
+                     end
+                  end
+                end
+
+        /* ---      ***FIND***     --- */
+           when abbrev('FIND',w1,1) | zcmd = "RFIND" then do
+              if zcmd <> "RFIND" then
+                 argument = w2 w3
+              upper argument
+              argument = strip(argument)
+              zsel = null
+              hcc = 0
+              crp = ztdtop
+              find_loop = null
+              search = null
+              if zcmd = "RFIND" then do
+                  "TBTOP" mailtbl
+                  last_find = last_find + 1
+                  "TBSKIP" mailtbl "POSITION(ROWID) NUMBER("last_find")"
+                  end
+                 else
+                 "TBSKIP" mailtbl "POSITION(ROWID)"
+              if rc = 8 then f_smsg = "Wrapped"
+                        else f_smsg = "Found"
+
+              /* perform search */
+
+              if length(argument) = 0 then nop
+                 else
+              do forever
+                 search = MAILFLOC MAILFID MAILTLOC MAILTID MAILDATN,
+                  MAILDATD MAILTIME MAILACTN MAILSUBJ MAILTDS
+                  upper search
+                 if pos(argument,search) > 0 then do
+                    crp = rowid + 0
+                    rowcrp = crp
+                    last_find = rowcrp
+                        mailsmsg = f_smsg
+                        maillmsg = argument "found during search in row:" crp
+                        "Setmsg Msg(MAIL000)"
+                    leave
+                    end
+                 "TBSKIP" mailtbl "POSITION(ROWID)"
+                 if rc = 8 then do
+                       "TBTOP" mailtbl
+                       f_smsg = "Wrapped"
+                    if find_loop = "on" then do
+                        mailsmsg = "Not Found"
+                        maillmsg = argument "Not found during search"
+                        "Setmsg Msg(MAIL000)"
+                        rowid = crp
+                        leave
+                        end
+                        else find_loop = "on"
+                    end
+                 zsel = null
+                 end
+              end
+
+           when abbrev('SORT',w1,4) then do
+            if length(w2) > 1 then do
+                upper w2 w3
+                if w2 = "DATE" & length(w3) = 0 then w3 = "D"
+                if w2 = "TIME" & length(w3) = 0 then w3 = "D"
+                if length(w3) > 0 then w3 = substr(w3,1,1)
+                   else w3 = "A"
+                   if pos(w3,"AD") = 0 then w3 = "A"
+                x = wordpos(w2,"FROMNODE FROMUSER TONODE TOUSER",
+                    "DATE TIME ACTION")
+                if x = 0 then do
+                   mailsmsg = 'Error'
+                   maillmsg = 'Enter valid sort option: ',
+                   'FROMNODE FROMUSER TONODE TOUSER DATE TIME ACTION'
+                   end
+                else do
+                   w4 = "C"
+                   wh2 = w2  /* save the value to report on */
+                   last_sort = w2
+
+                   select
+                   when w2 = "DATE" then do
+                        w2 = "MAILDATN"
+                        w4 = "N"
+                        end
+                    when w2 = "FROMNODE" then w2 = "MAILFLOC"
+                    when w2 = "FROMUSER" then w2 = "MAILFID"
+                    when w2 = "TONODE"   then w2 = "MAILTLOC"
+                    when w2 = "TOUSER"   then w2 = "MAILTID"
+                    when w2 = "DATE"     then w2 = "MAILDATN"
+                    when w2 = "TIME"     then w2 = "MAILDATN" /* was MAILTIME */
+                    when w2 = "ACTION"   then w2 = "MAILACTN"
+                    otherwise nop;
+                    end
+
+           if w2 <> "MAILDATN" then
+              "TBSORT "mailtbl" FIELDS ("w2 w4","w3")"
+              else
+              "TBSORT "mailtbl" FIELDS (MAILDATN" w4","w3" MAILTIME C,"w3")"
+              mailsmsg = 'Sorted'
+              maillmsg = 'Mail sorted using field' wh2 'in order' w3
+              end  /* end sort processing */
+            end
+            else do
+                 zcmd = ''
+                 "DISPLAY PANEL(TMAILSRT)"
+                 if rc = 0 then do
+                    sort_parm = ''
+                    if length(action) = 1 then sort_parm = "MAILACTN C" action
+                       if length(action) = 1 then last_sort = "ACTION"
+                    if length(date)   = 1 then sort_parm = sort_parm,
+                       " MAILDATN N" date "MAILTIME C" date
+                       if length(date)   = 1 then last_sort = "DATE"
+                    if length(tonode) = 1 then sort_parm = sort_parm,
+                        " MAILTLOC C" tonode
+                       if length(tonode) = 1 then last_sort = "TONODE"
+                    if length(touser) = 1 then
+                        sort_parm = sort_parm "MAILTID C" touser
+                       if length(touser) = 1 then last_sort = "TOUSER"
+                    if length(fromuser) = 1 then sort_parm = sort_parm,
+                         " MAILFID C" fromuser
+                       if length(fromuser) = 1 then last_sort = "FROMUSER"
+                    if length(fromnode) = 1 then sort_parm = sort_parm,
+                          " MAILFLOC C" fromnode
+                       if length(fromnode) = 1 then last_sort = "FROMNODE"
+                    "TBSORT "mailtbl" FIELDS ("sort_parm")"
+                      trc = rc
+                    end
+                    else do
+                         mailsmsg = "Cancelled"
+                         maillmsg = "Sort cancelled"
+                         end
+                 end
+
+           end /* end of the when SORT process */
+
+          otherwise do
+                   mailsmsg = "Error"
+                   maillmsg = "Invalid TSO Mail Table Command entered:" zcmd
+                   end
+
+          end
+        end
+
+        /* Begin processing the individual message selections */
+
+        if substr(mailtds,2,message_ds_l) = left(message_ds,message_ds_l)
+           then message_ds_opt = "on"
+           else message_ds_opt = null
+
+        if zsel <> null then do
+        if zsel = "F" then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           if message_ds_opt = "on" then do
+              "Display Panel(TMAILFWD)"
+              end
+              else do
+                   if length(mailtds) = 0 then
+                        "DISPLAY PANEL(TMAILFWD)"
+                                          else
+                        "DISPLAY PANEL(TMAILFWF)"
+                   end
+           if rc = 0 then do
+              call fixsubj
+              "VPUT (FWD SENDSUBJ) SHARED"
+              Select
+                 when fwdfile = "Y" then fwdfile = "FILE("mailtds")"
+                 when fwdfile = "M" then do
+                      fwdfile = null
+                      message_ds_opt = "on"
+                      end
+                 otherwise fwdfile = null
+                 end
+              if message_ds_opt = "on" then
+                "SELECT CMD(%TMAILSND" fwdid,
+                    "MSG("mailtds")" debug
+              else
+                "SELECT CMD(%TMAILSND" fwdid,
+                    fwdfile "MSG('"tablet"(M"mailnum")')" debug
+              erc = rc
+              if erc = 0 then do
+                 if fwd <> "NEVER" then fwd = null
+                 sendsubj = null
+                 "VPUT (FWD SENDSUBJ) SHARED"
+                 mailactn = "Forwarded"
+                 call save_table
+                 mailsmsg = 'Forwarded'
+                 maillmsg = 'This message has been forwarded to' fwdid
+                 end
+                 else do
+                      mailsmsg = "Cancelled"
+                      maillmsg = "Forward cancelled"
+                      end
+           end
+        end
+
+        /* ----------------------------------------------- *
+         *            Merge data set into Message          *
+         * ----------------------------------------------- */
+        if zsel = "MF" then do
+           merge_force = "on"
+           zsel = "M"
+           end
+           else merge_force = null
+        if zsel = "M" then do
+           merge = null
+           if length(mailtds) = 0 then do
+              mailsmsg = "Error"
+              maillmsg = "Invalid option for this message"
+              merge = "No"
+              end
+           if sysdsn(mailtds) <> "OK" then do
+              mailsmsg = "Error"
+              maillmsg = "The data set associated with this message no",
+                         "longer exists" mailtds
+              merge = "No"
+              end
+           if merge <> "No" then do
+              x = listdsi(mailtds)
+              if syslrecl > 80 then merge_ds = "ng"
+                 else merge_ds = "ok"
+              if left(sysrecfm,1) = "V" then do
+                 if syslrecl > 84 then merge_ds = "ng"
+                    else merge_ds = "ok"
+                 end
+              if merge_force = "on" then merge_ds = "ok"
+              if merge_ds = "ng" then do
+                 mailsmsg = "Error"
+                 maillmsg = "Reqeuested data set cannot be merged into",
+                            "the message.  Record size" syslrecl,
+                            " greater than 80"
+                 end
+              else do
+                 m_ddn = "M"random()
+                 parse value '' with md. mm.
+                 Address TSO
+                 "Alloc f("m_ddn") ds("mailtds") SHR REUSE"
+                 "Execio * Diskr" m_ddn "(Finis Stem md."
+                 "Free f("m_ddn")"
+                 "Alloc f("m_ddn") ds('"tablet"(M"mailnum")') Shr Reuse"
+                 "Execio * Diskr" m_ddn "(Finis Stem mm."
+                 x = mm.0 + 1
+                 mm.0 = x
+                 mm.x = center("Converted Data",72,'-')
+                 "Execio * Diskw" m_ddn "(Stem mm."
+                 "Execio * Diskw" m_ddn "(Finis Stem md."
+                 Address ISPEXEC
+                  Address TSO "Free f("m_ddn")"
+                 mailsmsg = "Done"
+                 maillmsg = "Data set merged into Message and the data set",
+                            "has been deleted"
+                 x = Msg("OFF")
+                 Address TSO "Delete" mailtds
+                 x = Msg("ON")
+                 mailtds = null
+                 mailfds = null
+                 mailactn = "Merged"
+                 call save_table
+                 end
+              end
+        end
+
+        if zsel = "A" then do
+           call fixsubj
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           "VPUT (SENDSUBJ) SHARED"
+           call fix_ibmmail
+           if length(mailfloc) = 0 then
+              "SELECT CMD(",
+              "%TMAILSND" mailfid debug ")"
+           else
+              "SELECT CMD(",
+              "%TMAILSND" strip(mailfloc)"."strip(mailfid) debug ")"
+           erc = rc
+           sendsubj = null
+           "VPUT (SENDSUBJ) SHARED"
+           if erc = 0 then do
+                mailactn = "Answered"
+                call save_table
+                mailsmsg = 'Answered'
+                maillmsg = 'An Answer has been sent to',
+                          strip(mailfloc)"."strip(mailfid)
+                end
+           else do
+                mailsmsg = 'Cancelled'
+                maillmsg = 'Answer has been cancelled to',
+                          strip(mailfloc)"."strip(mailfid)
+                end
+           end
+
+        if zsel = "P" then do
+           "VGET (TSOMPRT TSOMPRTO) PROFILE"
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           zsel_print = "ok"
+           if length(mailtds) > 0 then
+              if message_ds_opt <> "on" then do
+                 "Display Panel(tmailpo)"
+                 if rc > 4 then zsel_print = null
+                 if printopt = "Y" then message_ds_opt = "on"
+                 end
+           if zsel_print = "ok" then do
+              if length(tsomprt) = 0 then do
+                    if message_ds_opt = "on" then
+                    "SELECT CMD(",
+                    "%KPRINT "mailtds" ) NEWAPPL(ISR)"
+                    else "SELECT CMD(",
+                    "%KPRINT '"tablet"(M"mailnum")') NEWAPPL(ISR)"
+                    end
+                    else do
+                    if message_ds_opt = "on" then
+                       "SELECT CMD(",
+                       "PR DS("mailtds") NOTRC DEST("tsomprt")" tsomprto
+                       else "SELECT CMD(",
+                       "PR DS('"tablet"(M"mailnum")') NOTRC DEST("tsomprt")",
+                           tsomprto
+                    end
+              mailactn = "Printed"
+              call save_table
+              mailsmsg = 'Printed'
+              maillmsg = 'Message has been processed by the Rockwell',
+                         'PRINT dialog'
+              end
+           end
+
+        if zsel = "U" then do
+           mailactn = "Un-Read"
+           call save_table
+           mailsmsg = 'Flaged'
+           maillmsg = 'Message has been flaged for future reading'
+           end
+
+        if zsel = "C" then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           "DISPLAY PANEL(TMAILCML)"
+           if rc = 0 then do
+              call save_table
+              mailsmsg = 'Changed'
+              maillmsg = 'Message information has been updated'
+              end
+        end
+
+        /* Perform logging of messages in this routine */
+        if zsel = "L" then do
+           "CONTROL DISPLAY SAVE"
+           parse value null with logds lognum
+           "VPUT (LOGDS LOGNUM)"
+           if length(logsel) = 0 then log_n = ''
+           if length(logsel) > 0 then log_n = logsel
+           if pos(".",logsel) > 0 then log_n = strip(logsel,,'.')
+           "Select CMD(%TMAILLOG LOG" log_n")"
+           "VGET (LOGDS LOGNUM)"
+           if length(lognum) = 0 then do
+                 mailsmsg = 'Cancelled'
+                 maillmsg = 'Log processing has been cancelled'
+                 "SETMSG MSG(MAIL000)"
+                 end
+                 else do
+                     call copy_to_log
+                     mailsmsg = 'Logged'
+                     maillmsg = 'Log processing successfully completed'
+                     "SETMSG MSG(MAIL000)"
+                     end
+           "CONTROL DISPLAY Restore"
+           end
+
+        if zsel = "S" && zsel = "B" && zsel = "E" && zsel = "R" then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           x = listdsi(mailtds "norecall")
+               select
+                 /* exists */
+                 when sysreason = 0  then x = "OK"
+                 /* migrated to disk */
+                 when sysreason = 9  then x = "OK"
+                 /* migrated to tape */
+                 when sysreason = 25 then x = "OK"
+                 otherwise x = "NG"
+                 end
+           if length(mailtds) > 0 & x = "OK" & message_ds_opt = null then
+              do until drc > 0
+              if subopt <> null then do
+                x = pos(".",subopt)
+                if x > 0 then subopt = substr(subopt,x+1,1)
+                end
+              if subopt = null then do
+                   "DISPLAY PANEL(TMAILFIL)"
+                                 end
+                 else do
+                   zcmd = subopt
+                   rc = 0
+                      end
+              drc = rc  /* save return code */
+              if drc > 0 then do
+                 mailsmsg = 'Processed'
+                 maillmsg = 'File' mailtds 'has been processed'
+                 "SETMSG MSG(MAIL000)"
+                 mailactn = "File Select"
+                 call save_table
+                 end
+            else do
+                 select
+                 when zcmd = 0 then do
+                      "BROWSE DATASET('"tablet"(M"mailnum")')"
+                      end
+                 when zcmd = 1 then do
+                      "BROWSE DATASET("mailtds")"
+                      end
+                 when zcmd = 2 then do
+                      "EDIT DATASET("mailtds")"
+                      end
+                 when zcmd = 3 then do
+                 "VGET (TSOMPRT) PROFILE"
+                      if length(tsomprt) = 0 then
+                      "SELECT CMD(",
+                      "%KPRINT"  mailtds ") NEWAPPL(ISR)"
+                      else
+                      "SELECT CMD(",
+                      "%KPRINT"  mailtds "DEST("tsomprt")) NEWAPPL(ISR)"
+                      sel_msg = "on"
+                      end
+                 when zcmd = 4 then do
+                      parse var mailsubj x1 x2 x3
+                       x = pos(".",x3)
+                       newname = substr(x3,x+1,length(x3)-x)
+                      "DISPLAY PANEL(TMAILFRN)"
+                      if rc = 0 then do
+                             x = listdsi(newname "norecall")
+                             if sysreason = 5 then do
+                                     Address TSO,
+                                     "RENAME" mailtds newname
+                                      mailtds = newname
+                                      mailactn = "Rename"
+                              mailsmsg = 'File Renamed'
+                              maillmsg = 'File' mailtds 'has been',
+                                        'renamed to' newname
+                              call save_table
+                                             end
+                              else do
+                              mailsmsg = 'Rename Failure'
+                              maillmsg = 'File' newname 'currently exists',
+                                         'choose another name'
+                                             end
+                      end
+                 end  /* end of the '4' select */
+
+                 when zcmd = 5 then do
+                      "SELECT CMD(",
+                      "%TMAILCPY" mailtds mailsubj mailfloc mailfid debug")"
+                      sel_msg = "on"
+                      end
+
+                 when zcmd = 6 then do
+                      Address TSO "PDS" mailtds
+                      end
+
+                 when zcmd = 7 then do
+                      drc = 4
+                      x = MSG("OFF")
+                      Address TSO "DELETE" mailtds
+                      mailsmsg = 'File Deleted'
+                      maillmsg = 'File' mailtds 'has been deleted'
+                      mailtds = null
+                      call save_table
+                      end
+
+                 when zcmd = 8 then do
+                      if pos(".SERVLINK",mailfds) > 0 then do
+                         parse value mailfds with "A." ptfname ".SERVLINK" c
+                         targdsn = "IBMLINK."ptfname
+                         end
+                         else targdsn = null
+                      zcmd = null
+                      "DISPLAY PANEL(TMAILUNT)"
+                       if rc > 0 then do
+                             mailsmsg = 'Cancelled'
+                             maillmsg = 'Unterse processing for:' ,
+                                          mailtds 'has been cancelled'
+                             end
+                      else do
+                           Address TSO,
+                           "%TMAILPTF" mailfds mailtds targdsn
+                           sel_msg = "on"
+                           end
+                      end
+
+                 when zcmd = 9 then do
+                      zcmd = null
+                      "DISPLAY PANEL(TMAILFFL)"
+                         if rc > 0 then do
+                            mailsmsg = 'Cancelled'
+                            maillmsg = 'Forward of file:',
+                                         mailtds 'has been cancelled'
+                            end
+                         else do
+                            if ffnick <> null then do
+                                Address TSO,
+                               '%TMAILSND' ffnick 'DS('mailtds') Sendfile',
+                                           'nomsg' ffllog fflack
+                               sel_msg = "on"
+                               end
+                             else do
+                                Address TSO,
+                               '%TMAILSND' ffnode'.'ffuser 'DS('mailtds')',
+                                           'Sendfile nomsg' ffllog fflack
+                               sel_msg = "on"
+                               end
+                         end
+                      end
+
+                 otherwise nop;
+                 end /* end select processing */
+                 if subopt <> null then do
+                       subopt = null
+                       drc = 4
+                       if sel_msg <> "on" then do
+                          if mailsmsg = null then do
+                             mailsmsg = 'Processed'
+                             maillmsg = 'File' mailtds 'has been processed'
+                             end
+                          "SETMSG MSG(MAIL000)"
+                          end
+                          else sel_msg = "off"
+                       mailactn = "File Select"
+              call save_table
+                       end
+           end /* end actual processing */
+           end
+        else do
+           if zsel = "S" && zsel = "B" && zsel = "R" then do
+              if message_ds_opt = null then
+                 "BROWSE DATASET('"tablet"(M"mailnum")')"
+                 else
+                 "BROWSE DATASET("mailtds")"
+              mailactn = "Read"
+              call save_table
+              mailsmsg = 'Read'
+              maillmsg = 'Message has been reviewed using ISPF BROWSE'
+              end
+              else if zsel = "E" then do
+              if message_ds_opt = null then
+                 "EDIT DATASET('"tablet"(M"mailnum")')"
+                 else
+                 "EDIT DATASET("mailtds")"
+                 if rc = 0 then mailactn = "Edited"
+                           else mailactn = "Read"
+              call save_table
+              mailsmsg = mailactn
+              maillmsg = 'Message has been reviewed/updated using ISPF EDIT'
+              end
+           end
+        end
+
+        if zsel = "D" then do
+           "CONTROL DISPLAY SAVE"
+           ispfds = "on"
+           dm = null
+           if length(mailtds) > 0 then do
+               x = listdsi(mailtds "norecall")
+                   select
+                     when sysreason = 0  then x = "OK"
+                     when sysreason = 9  then x = "OK"
+                     when sysreason = 26 then x = "OK"
+                     otherwise x = "NG"
+                     end
+              if message_ds_opt = "on" then do
+                 if sysreason = 9 then Address TSO "HDEL" mailtds
+                 if sysreason = 0 then do
+                    if sysdsorg = "PS" then
+                       Address TSO "DEL"  mailtds
+                       else do
+                            parse value mailtds with "'" ds "(" mem ")'"
+                            "LMINIT DATAID(msgtb) DATASET('"ds"') Enq(Exclu)"
+                            "LMOPEN DATAID("msgtb") OPTION(OUTPUT)"
+                            "LMMDEL DATAID("msgtb") Member("mem")"
+                            "LMCLOSE Dataid("msgtb")"
+                            "LMFREE Dataid("msgtb")"
+                            end
+                    end
+                 parse value null with mailtds dm
+                 end
+            if x = "OK" & message_ds_opt = null then do
+              "DISPLAY PANEL(TMAILCFD)"
+              hrc = rc
+              if hrc = 8 then dm = "nono"
+              if hrc = 0 then do /* delete the table entry */
+                if pos(dmopt,"YES FILE") > 0 then do /* delete the data set */
+                  x = msg("OFF")
+                  if sysreason = 9
+                  then Address TSO "HDEL" mailtds
+                  else Address TSO "DEL"  mailtds
+                  x = msg("ON")
+                  dm = 'and related file' mailtds
+                  end
+                mailtds = null
+              end
+            else if pos(dmopt,"NO FILE") > 0 then dm = "nono"
+            end
+         end
+         if dm <> "nono" then do
+              "TBDELETE "mailtbl
+              x = outtrap("x.",'*')
+              rowcrp = 0
+              Address TSO "DEL '"tablet"(M"mailnum")'"  /* delete message */
+              x = outtrap('OFF')
+              "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+              mailsmsg = 'Deleted'
+              maillmsg = 'Messages' dm 'have been deleted'
+              end
+              else do
+                   mailsmsg = "Delete Cancelled"
+                   maillmsg = "Mail delete has been cancelled, use DM to",
+                              "delete only the message"
+                   end
+        end
+
+        if zsel = "DN" then do
+           x = outtrap("x.",'*')
+           Address TSO,
+           "DEL '"tablet"(M"mailnum")'"  /* delete message */
+           x = listdsi(mailtds "norecall")
+               if sysreason = 9 then Address TSO "HDEL" mailtds
+               if sysreason = 0 then Address TSO "DEL"  mailtds
+           x = outtrap('OFF')
+           "TBDELETE "mailtbl
+           "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+           mailsmsg = 'Deleted'
+           maillmsg = 'Message (and file) have been deleted'
+           end
+
+        if zsel = "DM" then do
+           x = outtrap("x.",'*')
+           Address TSO,
+           "DEL '"tablet"(M"mailnum")'"  /* delete message */
+           x = outtrap('OFF')
+           "TBDELETE "mailtbl
+           "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+           mailsmsg = 'Deleted'
+           maillmsg = 'Message has been deleted'
+           end
+
+        if zsel = "DF" then do
+           x = outtrap("x.",'*')
+               x = listdsi(mailtds "norecall")
+               if sysreason = 9 then Address TSO "HDEL" mailtds
+               if sysreason = 0 then Address TSO "DEL"  mailtds
+           x = outtrap('OFF')
+           mailtds = null
+           mailsmsg = 'Deleted'
+           maillmsg = 'Data set has been deleted'
+           end
+
+        end /* end of zsel processing */
+
+            if hcc = 0 & length(mailsmsg) > 0 then,
+                       "SETMSG MSG(MAIL000)"
+
+        end  /* end of do forever table processing */
+
+        copy_to_log:
+        /* The current message and ISPF table entry are copied by this
+           routine from the primary TSO Mail data set and ISPF Table
+           into the designated log data set and ISPF table. */
+
+           /*  Check for available space before doing the log  */
+           x = listdsi(logds "directory" "recall")
+           if sysextents > 10 then newtable = "yes"
+           if (sysadirblk-sysudirblk) < 5 then do
+                newtable = "yes"
+                sysadirblk = sysadirblk + 15
+                end
+           if newtable = "yes" then do
+              new_logds = strip(logds,,"'")
+              x = length(new_logds)
+              old_logds = overlay('O',new_logds,x)
+              new_logds = overlay('N',new_logds,x)
+              x = MSG("OFF")
+              Address TSO "DELETE '"new_logds"'"
+              Address TSO,
+              "Alloc ds('"new_logds"') NEW Like("table")"
+              Address TSO "Free  ds('"new_logds"')"
+              "LMINIT DATAID(tblin) DATASET("logds")"
+               "LMINIT DATAID(tblout) DATASET('"new_logds"')"
+               "LMCopy FROMID("tblin")",
+                      "TODATAID("tblout") FROMMEM(*)"
+               "LMFREE Dataid("tblin")"
+               "LMFREE Dataid("tblout")"
+             Address TSO
+             "DELETE  '"old_logds"'"
+             x = MSG("ON")
+             "RENAME" logds "'"old_logds"'"
+             "RENAME  '"new_logds"'" logds
+             Address ISPEXEC
+             newtable = null
+             end
+
+           "LIBDEF TM"lognum "DATASET ID("logds")"
+           "TBOPEN TM"lognum "LIBRARY(TM"lognum") WRITE"
+           mailactn = "Logged"
+           "TBADD TM"lognum
+           "TBCLOSE TM"lognum "LIBRARY(TM"lognum") REPLCOPY"
+           "LIBDEF TM"lognum
+           "TBDELETE "mailtbl
+           "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+           logdst = strip(logds,,"'")
+           "LMINIT DATAID(msgin) DATASET('"tablet"')"
+           "LMINIT DATAID(msgout) DATASET('"logdst"')"
+
+           "LMMove FROMID("msgin")",
+                  "TODATAID("msgout") FROMMEM(M"mailnum") REPLACE"
+
+           "LMFREE Dataid("msgin")"
+           "LMFREE Dataid("msgout")"
+          return
+
+        finfo1:    day      = substr(data.i,63,2)  /* day of month   */
+                   month    = substr(data.i,66,3)  /* month name abr */
+                   year     = substr(data.i,70,4)  /* year   y2k     */
+                   mailtime = substr(data.i,75,8)  /* time hh:mm     */
+                   mailtds  = null /* reset the target data set */
+                   call fixdate
+                   return
+
+        finfo2:    mailfloc = substr(data.i,17,8)  /* from node name */
+                   mailfid  = substr(data.i,26,8)  /* from userid    */
+                   mailtid  = userid
+                   mailtloc = center
+                   return
+
+        toinfo2:   mailtloc = substr(data.i,17,8)  /*  to node name  */
+                   mailtid  = substr(data.i,26,8)  /*  to userid     */
+                   return
+
+        toinfo1:   day      = substr(data.i,63,2)  /* day of month   */
+                   month    = substr(data.i,66,3)  /* month name abr */
+                   year     = substr(data.i,70,4)  /* year y2k       */
+                   mailtime = substr(data.i,75,8)  /* time hh:mm     */
+                   mailfid  = userid
+                   mailfloc = center
+                   call fixdate
+                   return
+
+        store_msg:
+        if type = "F" && type = null then do
+            /* type = null is not wanted in the table */
+           /* turn off flag as this is an */
+           msgcount = 0
+           parse value null with mailsubj mailfds long_message,
+                                 msg. mailtds type mailsmtp
+           return     /* incomplete file receive     */
+           end
+
+        call getnum
+        if mailactn = null then mailactn = 'Received'
+
+        if left(mailfid,4) = "SMTP" then do
+           mailfloc = null
+           mailfid  = mailsmtp
+           end
+
+        if left(mailtid,4) = "SMTP" then do
+           mailtloc = null
+           mailtid  = mailsmtp
+           end
+        if mailfds = "X.RECEIVE.INVALID.FILE" then call do_invalid_file
+
+        "TBADD "mailtbl
+
+        mailsmtp = null
+
+        mcount = mcount + 1
+        "VPUT (MCOUNT FCOUNT)"
+        if batch <> "on" & check <> "on" then do
+           "CONTROL DISPLAY LOCK"
+           "DISPLAY PANEL(TMAILWAT)"
+           end
+        else do
+           if batch = "on" & safe = "on" then
+           say "Message" mcount "has been added to the table with",
+                msgcount "records"
+           end
+
+        if long_message <> "on" then do
+           Address TSO
+           "ALLOC FILE(MSG) DS('"tablet"(M"mailnum")') SHR REUSE"
+           "EXECIO" msgcount "DISKW MSG (FINIS STEM msg."
+           "FREE FILE(MSG)"
+           Address ISPEXEC
+           end
+        else do
+             mailtds =  "'"message_ds"(M"mailnum")'"
+             upper mailtds
+             msgl.4 =   "Data set with your message is:" mailtds
+             call save_table
+             call check_message_ds
+             Address TSO
+             "ALLOC FILE(MSG) DS("mailtds") SHR"
+             "EXECIO * DISKW MSG (FINIS STEM msg."
+             "FREE FILE(MSG)"
+             "ALLOC FILE(MSG) DS('"tablet"(M"mailnum")') SHR REUSE"
+             "EXECIO *  DISKW MSG (FINIS STEM msgl."
+             "FREE FILE(MSG)"
+             Address ISPEXEC
+             end
+        msgcount = 0
+        parse value null with mailsubj mailactn mailtds type msg. long_message
+        return
+
+        do_invalid_file:
+         invalid. = null
+         if "OK" <> sysdsn(mailtds) then return
+        inv_dd = "INV"random()
+        /*  Check space allocation for file *
+         *  to ignore large files:          *
+         *  > 10 blocks                     *
+         *  > 4 tracks                      *
+         *  > 1 cyl                         */
+        call listdsi mailtds
+        select
+           when sysunits = "BLOCK" then
+                if sysused > 10 then return
+           when sysunits = "TRACK" then
+                if sysused > 4  then return
+           when sysunits = "CYLINDER" then
+                if sysused > 1  then return
+           otherwise nop
+           end
+        Address TSO
+          "Alloc f("inv_dd") DS("mailtds") SHR"
+          "Execio * Diskr" inv_dd "(Finis Stem invalid."
+          "Free f("inv_dd")"
+          profs_msg_hdr = 'FE'x"MSG"
+          Select
+             when left(invalid.1,4) = profs_msg_hdr then do
+                  parse value invalid.1 with . "From:" ,
+                     mailfid "--" mailfloc "To:",
+                     mailtid "--" mailtloc maildatd mailtime
+                  mailfid  = strip(mailfid)
+                  mailfloc = strip(mailfloc)
+                  mailtid  = strip(mailtid)
+                  mailtloc = strip(mailtloc)
+                  "Delete" mailtds
+                  mailtds = null
+                  mailfds = null
+                  parse value maildatd with month '/' day '/' year
+                  /* now verify that the month/day/year are valid */
+                  if datatype(month) <> "NUM" then month = 00
+                  if datatype(day)   <> "NUM" then day = 00
+                  if datatype(year)  <> "NUM" then year = 00
+                  month = month + 100
+                  day   = day   + 100
+                  maildatn = year''right(month,2)''right(day,2)
+                  parse value invalid.3 with 7 subject 77 .
+                  mailsubj = "Ack:" subject
+                  msgcount = 5
+                  msg. = null
+                  msg.0 = 5
+                  msg.1 = " From:    " mailfid "at" mailfloc "  on " maildatd,
+                           mailtime
+                  msg.2 = " To:      " mailtid "at" mailtloc
+                  msg.3 = " Subject: " subject
+                  msg.4 = " "
+                  msg.5 = left(invalid.2,79)
+                  end
+             otherwise nop;
+          end
+        Address ISPEXEC
+        return
+
+        save_table:
+              "vget (newsubj) shared"
+              if length(newsubj) > 0 then do
+                 mailsubj = newsubj
+                 newsubj = ""
+                 "vput (newsubj) shared"
+                 end
+              "TBMOD "mailtbl
+              "TBSAVE "mailtbl" REPLCOPY LIBRARY("mailtbl")"
+              return
+
+        getnum:  Address TSO
+                 if mailnum = 0 then do
+                   /* open - read tsomnum */
+                   tsomnum = "TS"random()
+                   tso_numds = sysdsn("'"tablet"(TSOMNUM)'")
+                   "Alloc f("tsomnum") ds('"tablet"(TSOMNUM)') SHR"
+                   tsomnum_alloc = "on"
+                   if tso_numds = "OK" then
+                      "Execio * diskr" tsomnum "(Finis Stem numi."
+                      else numi.1 = 100000
+                      mailnum = numi.1
+                   end
+                 mailnum = mailnum + 1
+                /* now save it */
+                num. = null
+                num.1 = mailnum
+                "Execio * diskw" tsomnum "(Finis stem num."
+                Address ISPEXEC
+                return
+
+        fixdate:   x = wordpos(month,months)
+                   x = x + 100
+                   month = right(x,2)
+                   maildatn = year''month''day
+                   maildatd = month"/"day"/"year
+                   return
+
+        fixsubj:   if "Message: " = substr(mailsubj,1,9) then
+                   sendsubj = substr(mailsubj,9,length(mailsubj)-9)
+                   else
+                   sendsubj = mailsubj
+                   return
+
+        fix_ibmmail: procedure expose mailfid mailfloc
+                     if mailfloc <> "IBMMAIL" then return
+                     mailfid = mailfid"@ibmmail.com"
+                     mailfloc = ""
+                     return
+
+        reset_profile:
+          x = outtrap("trash.",'*')
+          Address TSO "PROFILE" intercom wtpmsg prof_pause
+          x = outtrap('OFF')
+          return
+
+        /* ------------------------------------------------------------- *
+         * check_message_ds                                              *
+         *                                                               *
+         * verify that the message pds exists and that there is enough   *
+         * room for new messages.                                        *
+         *                                                               *
+         * ------------------------------------------------------------- */
+        check_message_ds:
+        message_dsq = "'"message_ds"'"
+        if "OK" <> sysdsn(message_dsq) then do
+           Address TSO,
+           "ALLOC DS("message_dsq") NEW DIR(60) SPACE(30,90) TRACKS DSORG(PO)",
+           "RECFM(V B) LRECL(255) BLKSIZE("VB_Blksize")"
+           end
+        else do
+           x = listdsi(message_dsq directory)
+           if sysextents > 10 then newtable = "yes"
+           if (sysadirblk-sysudirblk) < 5 then do
+                newtable = "yes"
+                sysadirblk = sysadirblk + 15
+                end
+           end
+
+        if newtable == "yes" then do
+           if batch <> "on" & check <> "on" then do
+             members = sysmembers
+             "CONTROL DISPLAY LOCK"
+             "DISPLAY PANEL(TMAILNTW)"
+             end
+          x = msg("OFF")
+          Address TSO "Delete" message_nds
+          Address TSO,
+           "ALLOC DS("message_nds") NEW DIR("sysadirblk")",
+           "SPACE("sysalloc",90) TRACKS DSORG(PO)",
+           "RECFM(F B) LRECL(80) BLKSIZE("FB_Blksize")"
+          "LMINIT DATAID(tblin) DATASET("message_dsq")"
+          "LMINIT DATAID(tblout) DATASET("message_nds")"
+          "LMCopy FROMID("tblin")",
+                 "TODATAID("tblout") FROMMEM(*)"
+          "LMFREE Dataid("tblin")"
+          "LMFREE Dataid("tblout")"
+          Address TSO "DELETE" message_ods
+          Address TSO "RENAME" message_dsq message_ods
+          Address TSO "RENAME" message_nds message_dsq
+          newtable = null
+          end
+          return

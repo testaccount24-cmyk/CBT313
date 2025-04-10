@@ -1,0 +1,425 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPBB                                            *
+         *                                                               *
+         * Function:  Called by SOFTPUBA to BUILD the ISPF tables used   *
+         *            by the Softcopy dialog.                            *
+         *                                                               *
+         * Syntax:    %SOFTPBB build_table prod_table debug              *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *                                                               *
+         * History:                                                      *
+         *            06/05/00 - add shelf name to softpalb              *
+         *            12/31/97 - trap hrecall messages                   *
+         *            01/22/96 - add pubno suffix as well                *
+         *            01/20/96 - add pub number (pubno) to table         *
+         *            12/26/95 - call softpbrc to recall all shelves     *
+         *                       add key to softpall and softcopy        *
+         *            11/10/95 - add key to softpalb table to elim dups  *
+         *            06/21/95 - fix for ST in all books build           *
+         *            04/20/95 - build softpalb table of all books       *
+         *            03/18/93 - build softpall table of all items       *
+         *            02/10/93 - support for multiple access records     *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        parse arg build_table prod_table debug access_table.
+
+        if debug = "on" then trace i
+
+        cat  = "Recall"
+        item = "Recalling all bookshelves - started" time()
+        call Please_Wait
+        Address ISPExec "Select Cmd(%softpbrc)"
+        item = "Recalling all bookshelves - ended" time()
+        call Please_Wait
+
+        null     = ""
+        ddn      = "SFT"random()
+        table_id = 1000
+        level    = 1
+        hold_access.  = null
+        hold_access.0 = 0
+
+        table = strip(build_table,,"'")
+        if "OK" <> sysdsn("'"table"(BUILD)'") then do
+           smsg = null
+           lmsg = "The requested build data set is not valid as",
+                  "the BUILD member does not exist in data set: ",
+                  build_table
+           call Exit_Build
+           end
+
+        Address ISPEXEC,
+          "LMINIT DATAID(dataid) DATASET("build_table") ENQ(SHRW)"
+
+        Call Clean_Build_Dataset
+
+        prod  = strip(prod_table,,"'")
+        if sysdsn("'"prod"(GG)'") = "OK" then do
+           "Alloc f("ddn") SHR Reuse DS('"prod"(GG)')"
+           "Execio * Diskr" ddn "(Finis Stem g."
+           gg = g.1 + 1
+           if gg = 100 then gg = 0
+           end
+           else gg = 1
+
+        "Alloc f("ddn") SHR Reuse DS('"table"(GG)')"
+        g.1 = gg
+        "Execio * Diskw" ddn "(Finis Stem g."
+        "Free  f("ddn")"
+        drop g.
+
+        gg = gg + 100
+
+        "Alloc f("ddn") SHR DS('"table"(BUILD)')"
+        "Execio * Diskr" ddn "(Finis Stem build."
+        "Free f("ddn")"
+
+        "Alloc f("ddn") SHR Reuse DS('"table"(MASTER)')"
+        "Execio * Diskw" ddn "(Finis Stem build."
+        "Free f("ddn")"
+
+        Address ISPEXEC
+
+        "Lmmstats Dataid("dataid") Member(MASTER)"
+
+        "Libdef SOFTPB Dataset ID("build_table")"
+
+        "TBCREATE SOFTCOPY Keys(data)",
+                          "NAMES(type desc access pubno)",
+                          "Library(SOFTPB) Write"
+
+        "TBCREATE SOFTPALL Keys(data)",
+                          "NAMES(type desc access pubno)",
+                          "Library(SOFTPB) Write"
+
+        "TBCREATE SOFTPALB Keys(data)",
+                          "NAMES(type desc access pubno bshelf)",
+                          "Library(SOFTPB) Write"
+
+        parse value null with tables item
+        table  = "SOFTCOPY"
+        cat    = table
+
+        Do i = 1 to build.0
+           if left(build.i,1) = "*" then iterate
+           row = translate(build.i)
+           call Please_Wait
+           Select
+             When left(row,1) = "C" then call New_Category
+             When left(row,1) = "S" then call Do_Shelf
+             When left(row,1) = "B" then call Do_Book
+             When left(row,1) = "A" then call Do_Access
+             When left(row,1) = "E" then call End_Category
+             otherwise say "Error in row:" build.i
+             end
+        end
+
+        If level > 0 then do
+           /* close out all open tables */
+           count = words(tables)
+           do i = 1 to count
+              table = word(tables,i)
+              call Sort_Close_Table
+              end
+           end
+
+        /* signal skip_all */
+           type = "C"
+           data = "SOFTPALL"
+           desc = "All Bookshelves"
+           pubno = null
+           "TBADD" table
+           type = "C"
+           data = "SOFTPALB"
+           desc = "All Books"
+           "TBADD" table
+        skip_all:
+
+        table = "SOFTCOPY"
+         call Sort_Close_Table
+
+        table = "SOFTPALL"
+         call Sort_Close_Table
+
+        table = "SOFTPALB"
+         call Sort_Close_Table
+
+        "Lmmstats Dataid("dataid") Member(GG)"
+        "Libdef SOFTPB"
+        "LMFREE DATAID("dataid")"
+
+        Exit_Build:
+           Address ISPEXEC "VPUT (SMSG LMSG)"
+           Address ISPEXEC "Setmsg Msg(SOFTP000)"
+           exit 0
+
+        New_Category:
+          level = level + 1
+          table_id = table_id + 1
+          prev_table = table
+          tables = tables table
+          table = "SFT"right(gg,2)right(table_id,3)
+          type   = "C"
+          data   = table
+          pubno  = null
+          desc   = strip(substr(build.i,3,78))
+          cat    = table
+          access = null
+          "TBADD" prev_table
+          "TBCREATE" table "NAMES(type desc data access pubno)",
+                           "Library(SOFTPB) Write"
+          return
+
+        End_Category:
+          level  = level - 1
+          cnt    = words(tables) - 1
+          tables = subword(tables,1,cnt)
+          call Sort_Close_Table
+          table      = prev_table
+          if cnt = 0 then prev_table = table
+             else prev_table = word(tables,cnt)
+          if access_table.table = "on" then do
+             call end_access
+             access_table.table = null
+             end
+          return
+
+        End_Access:
+          if hold_access.0 = 1 then do
+             hold_access.0 = 0
+             hold_access.1 = null
+             accdata       = null
+             end
+          if hold_access.0 > 1 then do
+             acclev  = hold_access.0 - 1
+             accdata = hold_access.acclev
+             hold_access.0 = acclev
+             acclev  = acclev + 1
+             hold_access.acclev = null
+             end
+          return
+
+        Sort_Close_Table:
+              "TBSort"  table "Fields(DESC,C,A)"
+              "TBCLOSE" table "Library(SOFTPB)"
+              "Lmmstats Dataid("dataid") Member("table")"
+          return
+
+        Do_Shelf:
+          type   = "S"
+          data   = word(build.i,2)
+          if sysdsn("'"data"'") <> "OK" then return
+          access      = null
+          desc        = subword(build.i,3)
+          execio_stat = 0
+          pubno       = null
+          if desc = "" then do
+             Address TSO
+               "Alloc f("ddn") Shr Reuse Ds('"data"')"
+               "Execio * Diskr" ddn "(Finis Stem d."
+               "Free  f("ddn")"
+               execio_stat = 1
+             Address ISPEXEC
+             do c = 1 to d.0
+                title = translate(d.c)
+                if left(title,9) <> "BKSTITLE=" then iterate
+                desc = strip(substr(d.c,10,70))
+                leave
+                end
+             drop d.
+             end
+          item   = desc
+          bshelf = desc
+          "TBADD" table
+          call add_all
+          if execio_stat = 0 then do
+             Address TSO
+               call listdsi "'"data"' norecall"
+               if sysvolume = "MIGRAT" then do
+                  call outtrap 'hr.'
+                  "Hrecall 'data' Wait"
+                  call outtrap 'off'
+                  drop hr.
+                  end
+             "Alloc f("ddn") Shr Reuse Ds('"data"')"
+             "Execio * Diskr" ddn "(Finis Stem d."
+             "Free  f("ddn")"
+             end
+          type   = "B"
+          pubno  = null
+             Address ISPEXEC
+             do c = 1 to d.0
+                text = translate(d.c)
+                if left(text,2) = "SH" then do
+                   pubno = substr(d.c,3,12)
+                   parse value pubno with pubno1 "-" pubno2 "-" pubno3
+                   pubno = strip(pubno1)strip(pubno2)strip(pubno3)
+                   end
+                if left(text,2) = "ST" then
+                   desc = strip(substr(d.c,3,70))
+                if left(text,7) = "BKMDSN=" then do
+                   data = strip(substr(d.c,8,70))
+                   if length(desc) > 0 then
+                   "TBADD Softpalb"
+                   end
+                end
+             drop d.
+          return
+
+        Do_Book:
+          type   = "B"
+          data   = word(build.i,2)
+          access = null
+          desc   = subword(build.i,3)
+          pubno  = translate(data," ",".")
+          t      = words(pubno) - 1
+          pubno  = word(pubno,t)
+          if desc = "" then do
+             say "Error in row:" build.i
+             say "Description required."
+             return
+             end
+          item   = desc
+          "TBADD" table
+          "TBADD Softpalb"
+          call add_all
+          return
+
+        Add_All:
+           if hold_access.0 > 0 then do
+              acclev = hold_access.0
+              access = hold_access.acclev
+              hdata = data /* $$ */
+              end
+          "TBADD  SOFTPALL"
+           access = null
+           return
+
+        Do_Access:
+          do forever
+             naccess = substr(build.i,3,77)
+             access  = translate(strip(access naccess))
+             ix = i + 1
+                row = translate(build.ix)
+                if left(row,1) <> "A" then leave
+                i = ix
+          end
+          call set_access
+
+          if type = "C" then do
+             "TBPUT" prev_table
+             access_table.prev_table = "on"
+             end
+             else do
+                  "TBPUT" table
+                  if length(accdata) > 0 then do
+                     access = accdata
+                     "TBPUT SOFTPALL"
+                     call end_access
+                     access = null
+                     end
+                  end
+          return
+
+        Set_Access:
+          acclev  = hold_access.0
+          if acclev = 0 then accdata = access
+                        else accdata = access hold_access.acclev
+          acclev  = acclev + 1
+          call clean_access
+          hold_access.acclev = accdata
+          hold_access.0 = acclev
+        return
+
+        Clean_access: procedure expose accdata
+        count = words(accdata)
+        parse value "" with c. all
+        c.0 = 0
+        do i = 1 to count
+           current = word(accdata,i)
+           hit = ""
+           do j = 1 to c.0
+              if c.j = current then hit = "y"
+              end
+           if hit  = "" then do
+              cc   = c.0 + 1
+              c.cc = current
+              c.0  = cc
+              all  = all current
+           end
+        end
+        accdata = strip(all)
+        return
+
+        Clean_Build_Dataset:
+        /* ----------------------------------------------- *
+         * Clean_Build_Dataset                             *
+         *                                                 *
+         * Removes all members from the BUILD Table Dataset*
+         * except the member BUILD, MASTER and OMASTER.    *
+         * Members REPORT and NEWSHELF are also retained.  *
+         *                                                 *
+         * Remove all OMAST after 5.                       *
+         * ----------------------------------------------- */
+        x = outtrap("lm.","*")
+
+           "LISTD "build_table" MEMBERS"
+
+        x = outtrap("off")
+
+        Address ISPEXEC
+
+         "LMOPEN DATAID("dataid") OPTION(OUTPUT)"
+
+        do i = 1 to lm.0
+           if lm.i = "--MEMBERS--" then signal domem
+           end
+
+        domem:  do j = lm.0 to i+1 by -1
+                parse value lm.j with mem extra
+                do_del = null
+                if mem = "MASTER" then call new_mast
+                if wordpos(mem,"SOFTCOPY SOFTPALB SOFTPALL",1) > 0
+                   then do_del = "y"
+                if left(mem,5) = "OMAST" then call new_mast
+                if left(mem,3) = "SFT"   then do_del = "y"
+                call del_mem
+                end
+
+        "LMCLOSE DATAID("dataid")"
+
+        Address TSO
+        return
+
+        Please_Wait:
+         Address ISPEXEC "Control Display Lock"
+         Address ISPEXEC "Display Panel(SOFTPBWT)"
+        return
+
+        del_mem:
+        if do_del <> null then
+           "LMMDEL DATAID("dataid") MEMBER("mem")"
+        return
+
+        new_mast:
+          if mem = "MASTER" then do
+             "LMMREN DATAID("dataid") Member(MASTER) NEWNAME(OMAST001)"
+             return
+             end
+          num = right(mem,3)
+          if num > 4 then do
+             do_del = "y"
+             end
+          else do
+               num = num + 1001
+               new_mem = "OMAST"right(num,3)
+               "LMMREN DATAID("dataid") Member("mem") NEWNAME("new_mem")"
+             end
+        return

@@ -1,0 +1,253 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPBC                                            *
+         *                                                               *
+         * Function:  Called by SOFTPBA to:                              *
+         *                                                               *
+         *            1. clean up old members in the production          *
+         *               softcopy table data set                         *
+         *                                                               *
+         *            2. Copy the newly built tables from the build      *
+         *               table data set into production.                 *
+         *                                                               *
+         * Syntax:    %SOFTPBC build_table prod_table debug              *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            25 N. Via Monte                                    *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: syslbd@ncal.kaiperm.org                  *
+         *                                                               *
+         * History:                                                      *
+         *            04/20/95 - copy all books category                 *
+         *            05/18/93 - correct delete statement in batch job.  *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        parse arg build_table prod_table debug
+
+        if debug = "on" then trace i
+
+        null     = ""
+        ddn      = "RIS"random()
+
+        build = strip(build_table,,"'")
+        prod  = strip(prod_table,,"'")
+
+        Address ISPEXEC,
+          "LMINIT DATAID(buildid) DATASET("build_table") ENQ(SHRW)"
+        Address ISPEXEC,
+          "LMINIT DATAID(prodid) DATASET("prod_table") ENQ(SHRW)"
+
+        Call Clean_Prod_Dataset
+
+        Call Copy_Build_to_Prod
+
+        Call Transmit_Table
+
+        Address ISPEXEC
+          "LMFREE DATAID("prodid")"
+          "LMFREE DATAID("buildid")"
+
+        smsg = null
+        lmsg = "Copy from BUILD into PRODUCTION is now complete."
+        "VPUT (SMSG LMSG)"
+        "SETMSG MSG(SOFTP000)"
+        Exit 0
+
+        Transmit_Table:
+        /* ----------------------------------------------- *
+         * Issue MVS/BDT to transmit the table to other    *
+         * centers                                         *
+         *                                                 *
+         * Also submit a batch tmp job to clean out old    *
+         * members in the table data set.                  *
+         * ----------------------------------------------- */
+        "%SOFTPDFT"
+        Address ISPEXEC "Vget Centers"
+        members = tran_mem.1
+        do i = 2 to tran_mem.0
+           members = members","tran_mem.i
+           end
+        x = outtrap("trap.","*")
+        do c = 1 to words(centers)
+           center = word(centers,c)
+           call bdt_deljob
+           Address ISPEXEC
+           "Control Display Lock"
+           "Display Panel(SOFTPBWB)"
+           Address TSO
+              "BDT Q FROM LOC("home") DS("build_table") SHR ",
+                  "PARM(R=Y S M=("members")) DAP(PDS) ",
+                  "TO LOC("word(centers,c)") SHR DAP(PDS) ",
+                  "DS("prod_table") PARM(MSG=S)"
+           end
+        x = outtrap("off")
+        return
+
+        Copy_Build_to_Prod:
+        /* ----------------------------------------------- *
+         *                                                 *
+         * Copy Build into Prod                            *
+         *                                                 *
+         * ----------------------------------------------- */
+
+        "Alloc f("ddn") SHR Reuse DS('"build"(GG)') Reuse"
+        "Execio * Diskr" ddn "(Finis Stem g."
+        "Free  f("ddn")"
+        gg = g.1
+
+        tran_mem.  = ""
+        tran_mem.0 = 0
+
+      /*"Showtso Center"
+        home  = center */
+
+        drop lm.
+        x = outtrap("lm.","*")
+
+           "LISTD "build_table" MEMBERS"
+
+        x = outtrap("off")
+
+        Address ISPEXEC
+
+        do i = 1 to lm.0
+           if lm.i = "--MEMBERS--" then signal ckmem
+           end
+
+        ckmem:  do j = lm.0 to i+1 by -1
+                parse value lm.j with mem extra
+                do_copy = null
+                if left(mem,4) = "MAST" then do_copy = "on"
+                if mem         = "GG" then do_copy = "on"
+                if left(mem,3) = "SFT" then do
+                   w_gg = substr(mem,4,2)
+                   if w_gg = gg then do_copy = "on"
+                   end
+                call copy_mem
+                end
+
+        /* now copy the def table */
+        mem = "SOFTPALL"
+        do_copy = "on"
+        call copy_mem
+
+        /* now copy the book table */
+        mem = "SOFTPALB"
+        do_copy = "on"
+        call copy_mem
+
+        /* now copy the key table */
+        mem = "SOFTCOPY"
+        do_copy = "on"
+        call copy_mem
+
+        "LMCLOSE DATAID("prodid")"
+
+        Address TSO
+        return
+
+        Copy_Mem:
+        if do_copy = null then return
+
+         "Control Display Lock"
+         "Display Panel(SOFTPBWC)"
+
+        tc          = tran_mem.0 + 1
+        tran_mem.tc = mem
+        tran_mem.0  = tc
+
+        "LMCopy Fromid("buildid") todataid("prodid")",
+           "Replace Frommem("mem") Tomem("mem")"
+        return
+
+        Clean_Prod_Dataset:
+        /* ----------------------------------------------- *
+         * Clean_Prod_Dataset                              *
+         *                                                 *
+         * Remove old SFT members                          *
+         * ----------------------------------------------- */
+
+        if sysdsn("'"prod"(GG)'") <> "OK" then gg = 00
+           else do
+               "Alloc f("ddn") SHR Reuse DS('"prod"(GG)')"
+               "Execio * Diskr" ddn "(Finis Stem g."
+               "Free  f("ddn")"
+               gg = g.1
+               end
+
+        x = outtrap("lm.","*")
+
+           "LISTD "prod_table" MEMBERS"
+
+        x = outtrap("off")
+
+        Address ISPEXEC
+
+        "LMOPEN DATAID("prodid") OPTION(OUTPUT)"
+
+        del_member.  = null
+        del_member.0 = 0
+
+        do i = 1 to lm.0
+           if lm.i = "--MEMBERS--" then signal domem
+           end
+
+        domem:  do j = lm.0 to i+1 by -1
+                parse value lm.j with mem extra
+                do_del = null
+                if left(mem,5) = "OMAST" then do_del = "on"
+                if left(mem,3) = "SFT" then do
+                   w_gg = substr(mem,4,2)
+                   if (w_gg + 1) > gg  then do_del = null
+                      else do_del = "on"
+                   end
+                if do_del <> null then
+                   call del_mem
+                end
+
+        "LMCLOSE DATAID("prodid")"
+
+        Address TSO
+        return
+
+        del_mem:
+        if do_del = null then return
+           "LMMDEL DATAID("prodid") MEMBER("mem")"
+           cnt            = del_member.0 + 1
+           del_member.cnt = mem
+           del_member.0   = cnt
+        return
+
+        BDT_Deljob:
+        /* ----------------------------------------------- *
+         *                                                 *
+         * build and submit batch job to clean out         *
+         * softcopy table data set.                        *
+         *                                                 *
+         * ----------------------------------------------- */
+        if del_job <> "on" then do
+           Address ISPEXEC "VGET (Ztempf Zacctnum)"
+           jcl.  = null
+           jcl.0 = 6
+           jcl.1 = "//"left(sysvar(sysuid),8)" JOB '"left(zacctnum,52)"',"
+           id=sysvar(sysuid)
+           jcl.2 = "// PRTY=3,MSGLEVEL=(1,1),TIME=5,MSGCLASS=T,NOTIFY="id
+           jcl.3 = "//*ROUTE XEQ" center
+           jcl.4 = "//STEP EXEC PGM=IKJEFT01,DYNAMNBR=50"
+           jcl.5 = "//SYSTSPRT  DD SYSOUT=*"
+           jcl.6 = "//SYSTSIN   DD *"
+           do mc = 1 to del_member.0
+              cc = jcl.0 + 1
+              jcl.cc = " DELETE '"prod"("del_member.mc")'"
+              jcl.0 = cc
+              end
+           end
+           jcl.3 = "//*ROUTE XEQ" center
+           "Alloc f("ddn") Shr Reuse Dsn('"ztempf"')"
+           "Execio * diskw" ddn "(Finis stem jcl."
+           "Free  f("ddn")"
+           "Submit '"ztempf"'"
+        return

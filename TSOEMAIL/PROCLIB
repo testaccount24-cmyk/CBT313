@@ -1,0 +1,17 @@
+./ ADD NAME=SAFEMAIL
+//SAFEMAIL PROC
+//* --------------------------------------------------------------*
+//*                                                               *
+//*   THIS STARTED TASK IS CALLED ONCE PER DAY BY THE AUTOMATION  *
+//*   PRODUCT AND PRESERVES MAIL AND/OR FILES FOR THOSE           *
+//*   INDIVIDUALS WHO REQUEST IT TO PREVENT THEIR OUTPUT FROM     *
+//*   BEING PURGED FROM THE JES SPOOL BECAUSE OF AGE.             *
+//*                                                               *
+//*                                                               *
+//* AUTHOR:  LIONEL DYCK 05/01/90                                 *
+//* --------------------------------------------------------------*
+//IEFPROC  EXEC PGM=IKJEFT01,DYNAMNBR=50,
+//         PARM='%TMAILSAF READ'
+//SYSTSPRT DD  SYSOUT=*
+//SYSTSIN  DD  DUMMY
+//SYSEXEC  DD  DISP=SHR,DSN=AISC.ROCK.CLIST

@@ -1,0 +1,161 @@
+)Panel Keylist(Help,EOXR)
+)Attr Default(@+_)
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+   @ type(text) intens(high)
+   + type(text  ) intens(low )
+     skip(on)
+   # area(SCRL) Extend(ON)
+)Body
++----------------@ Softcopy Publications Administration Menu +------------------
+@Command ===>_zcmd
+@
++
+#help -------------------------------------------------------------------------#
+)Area Help
++    Tutorial for the Softcopy Publications Administration Application
++
++    This tutorial consists of the following sections:
+
+     1.  Overview
+     2.  Administration Applications
+     3.  Upload Instructions
+     4.  Dialog Elements
+
++ 1. Overview
++
++    This administration application is written to support the locally
++    developed ISPF front-end interface to the IBM BookManager Read/MVS
++    product.  It is written using standard ISPF services and is driven
++    using procedures written in TSO/E REXX.
++
++    The Rexx procedure SOFTPDFT contains variables that define the
++    high-level qualifier for the softcopy application and the names of the
++    production and build control data sets.  The control data sets are
++    partitioned and contain text and ISPF tables.
++
++ 2. Administration Applications
++
++    This application is intended to be used by selected individuals to
++    define and control the Softcopy Publications environment.  The following
++    options are available as part of this application:
+
+    @1+ Build            Build the Softcopy ISPF Tables
++
++       This application will take the BUILD member of the Softcopy
++       Work ISPF Table data set and construct a set of ISPF tables
++       that are used by the SOFTPUB application that is the front-end
++       to the IBM provided BookManager/Read MVS application.
++
++       The BUILD will copy the BUILD member into a member name MASTER
++       and rename previous MASTER members as OMASTnnn for future
++       reference.
++
++       Table Name "SOFTCOPY" is the primary ISPF table that defines the
++       hierarchy of softcopy categories.  Sub-tables are of the format
++       SFTggnnn, where 'gg' is a generation qualifier so that COPY can
++       be performed without impacting a currently active user.  'nnn'
++       is a sequential number starting with 001 for each category
++       defined.
++
++   @2+ Review           Review Contents of Softcopy ISPF Tables
++
++       A simple ISPF and Rexx application to just display the work
++       control data set tables.  Simplier than the Test option to just
++       review what has been defined and built.
++
++   @3+ Test             Test the built tables
++
++       This option will invoke the softcopy Display application using
++       a special parm that causes it to use the Work ISPF table data
++       set.
++
++   @4+ Copy             Copy the built tables into Production
++
++       This option copies the current tables from the BUILD work data
++       set into the production data set.  Current minus 2 versions of
++       the tables are also removed.  Member GG is replaced which
++       defines the current generation of tables.
++
+    @5+ Update Shelf     Update a Book Shelf (Edit)
++
++       Using ISPF Edit update a book shelf.
++
++
++   @6+ Collect          Collect a report of all Book Shelves for use in 5
++
++       This option will list all data sets under the defined high-level
++       index.  From this list all Book Shelves (.BKSHELF) are checked for
++
++       -  If the second qualifier is UPLOAD then the index file is
++          checked and the .BKSHELF is updated to reflect the correct
++          dsname for the index.  All Book names are also updated with
++          the correct index and suffix and the correct control
++          statement inserted into the .BKSHELF.
++       -  The title of the shelf is extracted and saved along with
++          the dsname in member REPORT of the work control data set.
++       -  Prior to saving the REPORT member, the previous REPORT member
++          is processed and compared to find any new book shelves.  If
++          new shelves are found then member NEWSHELF is created with
++          just the new shelves.  This member can then be copied into
++          member BUILD under the Construct option.
++
++   @7+ Update           Update the BUILD control member
++
++       Invokes ISPF Edit on the work control data set to allow the
++       administrator to update the BUILD member with new shelves from
++       member NEWSHELF - or to change the current BUILD member
++       structure.
++
++   @8+ Index Build      Invoke BookManager Read/MVS Index Utility
++
++       Invoke the IBM provided Book Manager Read/MVS Index creation
++       utility.
++
++
++
++ 3. Dialog Elements
++
++    ISPF Commands:      The following commands must be added to the
++                        ISPCMDS command table by the ISPF administrator:
++
++                        Verb      T  Action
++                                        Description
++                   '''' BOOKADM   5  SELECT CMD(%SOFTPUBA) NEWAPPL(EOXR)
++                                        Softcopy Administration Dialog
++                   '''' BOOKMAN   5  SELECT CMD(%SOFTPUB &ZPARM) NEWAPPL(EOXR)
++                                        Invoke BookManager Read front-end
++
++
++    ISPF Panels:        SOFTPUBA   Administration Menu
++                        SOFTPBHA   Tutorial panel for SOFTPUBA
++                        SOFTPBTP   Primary Table Display panel
++                        SOFTPUBD   Display table row information panel
++                        SOFTPBTS   Secondary Table Display panel
++                        SOFTPBWC   COPY 'wait' display panel
++                        SOFTPBWT   BUILD 'wait' display panel
++                        SOFTPUBH   Tutorial panel for SOFTPBTP/S
++                        SOFTPUBX   Table display for REVIEW application
++                        SOFTPBWB   Please wait panel
++                        SOFTPES    Edit/Update a Shelf and then Transmit it
++
++    ISPF Messages:      SOFTP00    ISPF Message member
++
++    REXX Procedures:
++                        SOFTPUB    End-user Application driver
++                        SOFTPUBA   Administration Application driver
++                        SOFTPBB    BUILD application
++                        SOFTPBC    COPY application
++                        SOFTPBRP   Generate REPORT text for BUILD
++                        SOFTPDFT   Set ISPF variables for tables and index
++                        SOFTPUBX   REVIEW application
++                        SOFTPBKL   Create a member of all new books (used by pu
++                        SOFTPES    Edit a shelf and then transmit it
++                        SOFTPLST   Create a list from a table
++
+)Init
+  .cursor = zcmd
+)Proc
+)end

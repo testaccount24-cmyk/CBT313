@@ -1,0 +1,1939 @@
+        /* --------------------  rexx procedure  -------------------- */
+        ver = "1.06"
+        /* Name:      SLM                                             *
+         * Function:  System Library Manager to provide the user with *
+         *            a list of the active system PARMLIB datasets and*
+         *            mebers to choose from.  Edit and Browse are     *
+         *            supported with Save-to enabled to edit a member *
+         *            from one library and save it into another       *
+         *            specific library (e.g. the first or second in   *
+         *            the list).                                      *
+         *                                                            *
+         *            Alternate process is to allow the user to       *
+         *            specify the datasets to work with via LOCAL     *
+         *            command when the parmlib dsns table is          *
+         *            displayed.                                      *
+         *                                                            *
+         *            If used with the NOSYS option then SLM is used  *
+         *            for normal users and their libraries.           *
+         *            (e.g. simple source member manager)             *
+         *                                                            *
+         * Syntax:    %slm options                                    *
+         *                                                            *
+         *            Allowed Options:                                *
+         *            - NOSYS                                         *
+         *                      Allows SLM to be used by normal users *
+         *                      to manage the members in their pds    *
+         *                      libraries and concatenations.         *
+         *                                                            *
+         *            - PLIB ddname                                   *
+         *                      indicates that SLM is to use the      *
+         *                      provided DDname for the list of       *
+         *                      libraries for the PARMLIB.            *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *            (925) 926-5332                                  *
+         *            Internet: lionel.b.dyck@kp.org                  *
+         *                                                            *
+         * History:                                                   *
+         *            09/25/06 - 1.06  - Release change to reflect    *
+         *                               updates to SLMJ2PRC          *
+         *            01/23/03 - 1.05  - Add new PLIB option          *
+         *                             - correct stage copy plus      *
+         *            01/17/03 - 1.04  - Fix NEW command with no mem  *
+         *            01/17/03 - 1.03  - Fix NEW member add to top dsn*
+         *            12/20/02 - 1.02  - Add Total count on DUP msg   *
+         *            12/16/02 - 1.01  - Support NOSYS option and     *
+         *                               feature                      *
+         *                             - Add counter and totals to add*
+         *                             - Add saveloc option           *
+         *                             - Add REPORT command to display*
+         *                               current custom settings      *
+         *                             - Improve processing if target *
+         *                               dataset if full on copy, edit*
+         *                               move or rename               *
+         *                             - new saveoptu for NOSYS use   *
+         *                             - Allow command line EDIT for  *
+         *                               new member creation          *
+         *                             - bypass inactive member remove*
+         *                               if only 1 library            *
+         *            12/09/02 - 1.00  - Declared ready for version   *
+         *                               1.00 and to be posted        *
+         *            12/06/02 - 0.99b - Cleanup for Release          *
+         *                             - Allow Insert # for dsns      *
+         *                             - Improve validation on insert *
+         *                               dsn's                        *
+         *                             - Fix test for dynam vs perm   *
+         *                             - Add panel prompt for inserts *
+         *                             - Add system id for dynamic add*
+         *                               for parmlib and jes2 and add *
+         *                               userid for other dynam adds  *
+         *                             - Add option for sequence #'s  *
+         *                               for the member compare       *
+         *                             - Support new ADD option to    *
+         *                               dynamically add temporarily  *
+         *                               currently allocated dd's     *
+         *                             - New ADD JES2 Command to add  *
+         *                               JES2 Procs (PROCxx)          *
+         *                             - allow Edit member on member  *
+         *                               table display                *
+         *                             - Support no save-lib properly *
+         *                             - allow Browse member on member*
+         *                               table display (B or S)       *
+         *                             - add filter display null      *
+         *                             - clean up to report on table  *
+         *                               enq and better messsages.    *
+         *                             - Moved slmlocal exec inline   *
+         *            11/20/02 - 0.999 - add display of filter option *
+         *            11/18/02 - 0.998 - fix compare                  *
+         *                             - add save option 6 to save    *
+         *                               last 4 copies.               *
+         *                             - prevent move with stagesuf   *
+         *                             - don't make backup copy of    *
+         *                               a working member (based on   *
+         *                               stagesuf)                    *
+         *            11/18/02 - 0.997 - add filter for member name   *
+         *                             - combine panels for display   *
+         *                             - fix active and duplicate     *
+         *            11/15/02 - 0.996 - fix active display           *
+         *            11/15/02 - 0.995 - fix slm1 panel display       *
+         *            11/14/02 - 0.994 - eliminate panel slm2         *
+         *                             - fix active display           *
+         *            11/14/02 - 0.993 - bypass tbdel on edit if      *
+         *                               lmcopy rc > 0                *
+         *            11/11/02 - 0.992 - add zlc4date and zlm4date    *
+         *                               for use in sort              *
+         *                             - other minor cleanujp         *
+         *            11/08/02 - 0.991 - added passlib to reinvoke    *
+         *                             - clean up member display      *
+         *                             - prepare for public release   *
+         *            02/26/00 - 0.990 - change plm to slm            *
+         *            02/23/00 - 0.99g - final fixes (i hope)         *
+         *            02/16/00 - 0.99f - several fixes                *
+         *            01/13/00 - 0.99e - fix sort and popup msgs      *
+         *            01/10/00 - 0.99d - change to System Library     *
+         *                               Manager                      *
+         *            ..                                              *
+         *            08/31/99 - creation as System Parmlib Manager   *
+         *                                                            *
+         * ---------------------------------------------------------- *
+         *  Copyright (C) 2002, Lionel B. Dyck                        *
+         *                                                            *
+         *  This program is free software; you can redistribute it    *
+         *  and/or modify it under the terms of the GNU General Public*
+         *  License as published by the Free Software Foundation;     *
+         *  either version 2 of the License, or (at your option) any  *
+         *  later version.                                            *
+         *                                                            *
+         *  This program is distributed in the hope that it will be   *
+         *  useful, but WITHOUT ANY WARRANTY; without even the implied*
+         *  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR   *
+         *  PURPOSE.  See the GNU General Public License for more     *
+         *  details.                                                  *
+         *                                                            *
+         *  You should have received a copy of the GNU General Public *
+         *  License along with this program; if not, write to the Free*
+         *  Software Foundation, Inc., 59 Temple Place - Suite 330,   *
+         *  Boston, MA  02111-1307,                                   *
+         *                                                            *
+         * ---------------------------------------------------------- */
+
+        signal on novalue
+
+        /* ----------------------------------------------------- *
+         * Get the passed parameters into options                *
+         * ----------------------------------------------------- */
+        arg options
+
+        /* ----------------------------------------------------- *
+         * If not under SLME applid then get into it             *
+         * ----------------------------------------------------- */
+        Address ISPEXEC "VGET ZAPPLID"
+          if zapplid <> "SLME" then do
+             Address ISPEXEC "Select",
+                "CMD(%"sysvar('sysicmd') options ") Newappl(SLME)" ,
+                    "Passlib"
+             Exit 0
+             end
+
+        /* ----------------------------------------------------- *
+         * Set initial defaults                                  *
+         * ----------------------------------------------------- */
+        parse value "" with null savedsn savevol savelib fix_lib,
+                            permsto all stagedsn saveperm imem ,
+                            open_flag open_tables topdsn plib ,
+                            topvol plib_pass
+
+        /* --------------------- *
+         * Test Provided Options *
+         * --------------------- */
+         if wordpos("NOSYS",options) > 0 then nosys = 1
+                                         else nosys = 0
+
+         if wordpos("PLIB",options) > 0 then do
+            w    = wordpos("PLIB",options) + 1
+            plib = word(options,w)
+            end
+
+        /* ----------------------------------------------------- *
+         * Get local customzation options from SLMCUST exec      *
+         * ----------------------------------------------------- */
+         cu = slmcust()
+         parse value cu with saveopt "/" savechar1 "/" savechar2 "/" ,
+                             stagesuf "/" stagedsn "/" permsto "/" ,
+                             slmpds "/" j2proc "/" saveoptu "/" ,
+                             saveloc
+
+        saveloc   = strip(saveloc)
+        saveopt   = strip(saveopt)
+        saveoptu  = strip(saveoptu)
+        if nosys  = 1 then saveopt = saveoptu
+        savechar1 = strip(savechar1)
+        savechar2 = strip(savechar2)
+        stagesuf  = strip(stagesuf)
+        stagedsn  = strip(stagedsn)
+        permsto   = strip(permsto)
+        slmpds    = strip(slmpds)
+        j2proc    = strip(j2proc)
+        cpu       = mvsvar('syssmfid')
+        dynamtbl  = "- dynamically determined on" cpu
+        pantype   = "Active"
+
+        /* ----------------------------------------------------- *
+         * Set ISPF Environment                                  *
+         * ----------------------------------------------------- */
+        Address ISPExec
+
+        /* ----------------------------------------------------- *
+         * Set Version for display                               *
+         * ----------------------------------------------------- */
+         "Vput (Ver)"
+
+        /* ----------------------------------------------------- *
+         * Have ISPF Errors return to the dialog                 *
+         * ----------------------------------------------------- */
+         "Control Return Errors"
+         call prompt "off"
+
+        /* ----------------------------------------------------- *
+         * Now ask user what list of libraries to use            *
+         * ----------------------------------------------------- */
+         call do_local
+
+        /* ----------------------------------------------------- *
+         * Display library datasets and get option for save dsn  *
+         * ----------------------------------------------------- */
+         Start0:
+         "TBCreate parmdsns Names(zsel lib dsn vol act) nowrite" ,
+                  "replace"
+
+        /* ----------------------------------------------------- *
+         * Extract the library dsns and volsers and put into     *
+         * ispf table.                                           *
+         * ----------------------------------------------------- */
+         if saveperm <> null then
+            permsto = saveperm
+         total = 0
+         Do i = 1 to parm.0
+            parse value parm.i with dsn '/' vol '/' sopt
+            dsn = strip(dsn)
+            if topdsn = null then do
+               topdsn = dsn
+               topvol = vol
+               end
+            vol = strip(vol)
+            dsn = strip(fix_dsnsym(dsn))
+            vol = strip(fix_volsym(vol))
+            if vol <> null then volume = "Volume("vol")"
+                           else volume = null
+            call listdsi "'"dsn"'" volume "Dir"
+            total = total + sysmembers
+            if translate(sopt) = "Y" then do
+               if saveperm = null then
+                  saveperm = permsto
+               permsto = i
+               end
+            lib = i
+            if tblname = "PARMLIB" then
+            if lib = permsto then do
+               act      = "Save-To Library"
+               savelib  = lib
+               savedsn  = dsn
+               "Vput (savelib savedsn) Profile"
+               act = null
+               end
+            "TBAdd parmdsns"
+            end
+            first_add = "Mult("total")"
+
+        /* ----------------------------------------------------- *
+         * Sort the table                                        *
+         * ----------------------------------------------------- */
+         "TBSort parmdsns Fields(lib,n,a)"
+         "TBTop parmdsns"
+
+        /* ----------------------------------------------------- *
+         * Get saved values for savelib and savedsn, update table*
+         * ----------------------------------------------------- */
+         if tblname = "PARMLIB" then
+            "Vget (savelib savedsn) Profile"
+         if savelib <> null then do
+            "TBTop parmdsns"
+            "TBSkip parmdsns Number("savelib")"
+            if savedsn = dsn then do
+               act      = "Save-To Library"
+               "TBPut parmdsns"
+               end
+            else do
+                 savelib = null
+                 savedsn = null
+                 end
+            end
+
+        /* ----------------------------------------------------- *
+         * Display the table of parmlib datasets                 *
+         * ----------------------------------------------------- */
+        if tblname = "PARMLIB" then
+        Do Forever
+           zsels = null
+           "TBTop parmdsns"
+           "TBDispl parmdsns panel(slm1)"
+           lrc = rc
+           if translate(zcmd) = "REPORT" then call do_report
+           if translate(zcmd) = "CANCEL" then do
+              "TBEnd parmdsns"
+              signal do_local
+              end
+           if lrc > 4 then do
+              "TBEnd parmdsns"
+              end
+           if lrc > 4 then leave
+           /* ----------------------------------------------------- *
+            * Browse selected                                       *
+            * ----------------------------------------------------- */
+           if zsel = "B" then do
+              if vol <> null then volume = "Volume("vol")"
+                             else volume = null
+              "Browse Dataset('"dsn"')" volume
+              if rc > 0 then do
+                 smsg = null
+                 lmsg = "Browse of dataset '"dsn"'" ,
+                        "ended with message:" zerrlm
+                 "Setmsg Msg(slmsg021)"
+                 end
+              end
+           /* ----------------------------------------------------- *
+            * Select the current row for savedsn                    *
+            * ----------------------------------------------------- */
+           if zsel = "S" then do
+              if savelib <> null then
+                 if savelib <> lib then
+                    fix_lib = savelib
+              zsel     = null
+              savedsn = dsn
+              savevol = vol
+              savelib = lib
+              act     = "Save-To Library"
+              "TBPut parmdsns"
+              "Vput (savelib savedsn) Profile"
+              if fix_lib <> null then do
+                 "TBTop parmdsns"
+                 "TBSkip parmdsns row("fix_lib")"
+                 act = null
+                 "TBPut parmdsns"
+                 end
+              end
+           /* ----------------------------------------------------- *
+            * Unselect the current row from savedsn                 *
+            * ----------------------------------------------------- */
+           if zsel = "U" then do
+              parse value null with savedsn savevol savelib act,
+                    zsel
+              "TBPut parmdsns"
+              "Vput (savelib savedsn) Profile"
+              end
+        end
+
+        /* ----------------------------------------------------- *
+         * Call the subroutine to build the ISPF Table           *
+         * ----------------------------------------------------- */
+        all = 0
+        call build_table
+
+       Start:
+        /* ----------------------------------------------------- *
+         * Process each Library into the table                   *
+         * ----------------------------------------------------- */
+        memnum = 0
+        parse value "" with cdsn cvol members
+        lib_max = parm.0
+        do i = 1 to parm.0
+           parse value parm.i with dsn '/' vol '/' sopt
+           dsn = fix_dsnsym(strip(dsn))
+           vol = fix_volsym(strip(vol))
+           if sopt <> null then do
+              savelib = i
+              savedsn = dsn
+              end
+           call get_mem
+           end
+
+        /* ----------------------------------------------------- *
+         * Test for All or Duplicate processing requests         *
+         * ----------------------------------------------------- */
+         popmsg2 = null
+         popmsg3 = null
+         "TBTop slm"
+         "TBSort slm fields(mem,c,a lib,c,a)"
+         sortopt = 1
+         pmem  = null
+         pmem2 = null
+         last  = 0
+         memnum = 0
+
+        /* ---------------------- *
+         * Process Active Request *
+         * ---------------------- */
+         if lib_max > 1 then
+         if all = 0 then do forever
+           popmsg1 = "Removing Inactive Entries"
+           memnum = memnum + 1
+           popmsg2 = "Checking:" memnum "of" total
+           if right(memnum,1) = 0 then do
+              "Control Display Lock"
+              "Addpop column(11) row(3)"
+              "Display Panel(slmpop)"
+              "Rempop"
+              end
+            "TBSkip slm number(1)"
+            if rc > 0 then leave
+            if pmem <> null then
+               if mem = pmem then do
+                  "TBDelete slm"
+                  "TBSkip slm number(1)"
+                  end
+             pmem2 = pmem
+             pmem  = mem
+            end
+
+        /* ------------------------- *
+         * Process Duplicate request *
+         * ------------------------- */
+         if all = 2 then do forever
+           popmsg1 = "Removing Non-Duplicates"
+           memnum = memnum + 1
+           popmsg2 = "Checking:" memnum "of" total
+           if right(memnum,1) = 0 then do
+              "Control Display Lock"
+              "Addpop column(11) row(3)"
+              "Display Panel(slmpop)"
+              "Rempop"
+              end
+            "TBSkip slm number(1)"
+            if rc > 0 then do
+               if pmem <> pmem2 then do
+                  "TBSkip slm number(-1)"
+                  "TBDelete slm"
+                  end
+               leave
+               end
+            if pmem <> null then
+               if mem <> pmem then
+                  if pmem <> pmem2 then do
+                     "TBSkip slm number(-1)"
+                     "TBDelete slm"
+                     "TBSkip slm number(1)"
+                     end
+             pmem2 = pmem
+             pmem  = mem
+             if last = 2 then leave
+             if last = 1 then do
+                "TBBottom slm"
+                "TBDelete slm"
+                end
+             if last = 1 then leave
+            end
+
+        /* ----------------------------------------------------- *
+         * Display the table of Library Members                  *
+         * ----------------------------------------------------- */
+         "TBTop slm"
+         "TBSort slm fields(mem,c,a lib,c,a)"
+          mult_sels = 0
+          crp = 1
+          rowcrp = 0
+
+        /* ----------------------------------------------------- *
+         * Display the member list table until user exits...     *
+         * ----------------------------------------------------- */
+         if imem = null then filtero = "Filter: "
+                        else filtero = "Filter:" imem
+          select
+            when all = 0 then pantype = "Active"
+            when all = 1 then pantype = "All"
+            when all = 2 then pantype = "Duplicate"
+            otherwise nop
+            end
+
+          do forever
+          zsel = null
+          row  = null
+          if mult_sels < 2 then do
+              "TBTop slm"
+              "TBSkip slm Number("crp")"
+              if rowcrp = 0 then
+                 "TBDispl slm Panel(slmlib)"
+              else
+                 "TBDispl slm Panel(slmlib)" ,
+                         "Csrrow("rowcrp") AutoSel(No)"
+              end
+         else
+            "TBDispl slm"
+            t_rc = rc
+            mult_sels = ztdsels
+           if rc > 4 then leave
+
+         /* ----------------------------------------------------- *
+          * Support Point-and-Shoot                               *
+          * ----------------------------------------------------- */
+          if row <> null then
+             if row > 0 then do
+                  osel = zsel
+                  "TBTop slm"
+                  "TBSkip slm Number("row")"
+                  zsel = osel
+                  end
+
+           crp = ztdtop
+           rowcrp = null
+           Select
+              when zcmd <> null then call do_zcmd
+              when zsel = null then nop
+             /* --------------------------------------------------- *
+              * Edit the member                                     *
+              * --------------------------------------------------- */
+              when zsel = "E" then do
+                   zsel = null
+                   cmd  = null
+                   if dup = 1 then do
+                      "Setmsg msg(slmsg020)"
+                      end
+                   else do
+                        call do_edit
+                        end
+                   end
+           /* ----------------------------------------------------- *
+            * Browse the member                                     *
+            * ----------------------------------------------------- */
+              when zsel = "B" then do
+                   if vol <> null then volume = "Volume("vol")"
+                                  else volume = null
+                   "Control Display Save"
+                   "Browse Dataset('"dsn"("mem")')" volume
+                   "Control Display Restore"
+                   end
+           /* ----------------------------------------------------- *
+            * View the member                                       *
+            * ----------------------------------------------------- */
+              when zsel = "V" then do
+                   if vol <> null then volume = "Volume("vol")"
+                                  else volume = null
+                   "Control Display Save"
+                   "View Dataset('"dsn"("mem")')" volume
+                   "Control Display Restore"
+                   end
+             /* --------------------------------------------------- *
+              * Compare the member                                  *
+              * --------------------------------------------------- */
+              when zsel = "C" then do
+                   "Control Display Save"
+                   cmem    = mem
+                   zsel    = null
+                   zcmd    = null
+                   temptbl = "temp"
+                   "TBCreate" temptbl "Names(zsel ldsn lvol)" ,
+                             "nowrite replace"
+                   do tx = 1 to parm.0
+                      parse value parm.tx with ldsn"/"lvol"/" .
+                      ldsn = "'"strip(ldsn)"'"
+                      "TBadd" temptbl
+                      end
+                   "TBTop" temptbl
+                   do forever
+                      zsel = null
+                      "TBDispl" temptbl "Panel(slmcp)"
+                      c_rc = rc
+                      if zsel <> null then do
+                         cdsn = ldsn
+                         cvol = lvol
+                         zsel = null
+                         end
+                      if translate(zcmd) = "CANCEL" then
+                         c_rc = 12
+                      if ztdsels = 0 then
+                      if c_rc = 0 then do
+                         if cmem = null then cmem = mem
+                         parse value cdsn with "'"cpdsn"'"
+                         cpdsn = "'"cpdsn"("strip(cmem)")'"
+                         if "OK" = sysdsn(cpdsn) then do
+                            call Do_Compare
+                            end
+                         else do
+                              smsg = "Error"
+                              lmsg = "Compare dataset" cpdsn ,
+                                     "Error" sysdsn(cpdsn)", try again."
+                              "Setmsg Msg(slmsg021)"
+                              c_rc = 0
+                              end
+                         if c_rc > 0 then leave
+                         end
+                      if c_rc > 0 then leave
+                      end
+                   "TBEnd" temptbl
+                   "Control Display Restore"
+                   end
+             /* --------------------------------------------------- *
+              * Move the member                                     *
+              * --------------------------------------------------- */
+              when zsel = "M" then
+                   if savelib = null then do
+                      smsg = "Error"
+                      lmsg = "Move not allowed when no Save-Lib",
+                             "is defined."
+                      "Setmsg Msg(slmsg021)"
+                      end
+                   else do
+                      if right(mem,1) = stagesuf then
+                         "Setmsg msg(slmsg022)"
+                      else if lib > 1 then
+                         "Setmsg msg(slmsg018)"
+                      else call do_move
+                      end
+             /* --------------------------------------------------- *
+              * Delete the member                                   *
+              * --------------------------------------------------- */
+              when zsel = "D" then do
+                   dok = 0
+                   if dok = 0 then do
+                      if vol <> null
+                         then volume = "Volume("strip(vol)")"
+                         else volume = null
+                      "Control Display Save"
+                      "Display Panel(slmdm)"
+                      lrc = rc
+                      del_mem = mem
+                      if lrc = 0 then call delete_member
+                      if pos(all,"1 2") > 0 then do
+                         "TBSkip slm"
+                         if mem = del_mem then do
+                            dup = 0
+                            "TBPut slm"
+                            end
+                         end
+                      "Control Display Restore"
+                      end
+                   end
+             /* --------------------------------------------------- *
+              * Rename the member                                   *
+              * --------------------------------------------------- */
+              when zsel = "R" then do
+                   rmem = mem
+                   rok = 0
+                   if dup = 1 then do
+                      "Setmsg msg(slmsg023)"
+                      rok = 1
+                      end
+                   if rok = 0 then do
+                      if vol <> null then volume = "Volume("vol")"
+                      "Control Display Save"
+                      "Display Panel(slmrn)"
+                      lrc = rc
+                      if lrc = 0 then do
+                         save_mem = mem
+                         mem      = rmem
+                         scrp = crp
+                         call Save_Copy
+                         if sc_rc < 9 then do
+                            mem      = save_mem
+                            call Do_Rename mem rmem
+                            end
+                         else do
+                              crp = scrp
+                              rowcrp = crp
+                              smsg = "Error"
+                              lmsg = "Problem with target" ,
+                                     "Dataset. Fix and retry."
+                              "Setmsg msg(slmsg021)"
+                              end
+                         end
+                      else "Setmsg msg(slmsg014)"
+                      "Control Display Restore"
+                      end
+                   end
+              otherwise  "Setmsg msg(slmsg010)"
+           end
+         end
+
+        /* ----------------------------------------------------- *
+         * all done so Free the Table and Exit                   *
+         * ----------------------------------------------------- */
+          "TBEnd slm"
+          signal do_local
+
+        /* ----------------------------------------------------- *
+         * Edit the selected Member                              *
+         * ----------------------------------------------------- */
+         Do_Edit:
+         copied = 0
+         stgcpy = 0
+         lmc_rc = 0
+           "Control Display Save"
+           if cmd = "NEW" then do
+              if stagesuf <> null then
+                 mem = overlay(stagesuf,mem,length(mem),1)
+              call do_editn
+              end
+           else call do_edit2
+           "Control Display Restore"
+           return
+
+         Do_Edit2:
+         if stagesuf <> null then do
+            nmem = overlay(stagesuf,mem,length(mem),1)
+            if mem <> nmem then do
+               call Find_Member nmem 'x'
+               if f_hit = 1 then do
+                  "Setmsg msg(slmsg013)"
+                  return
+                  end
+               if savedsn = null then do
+                  savedsn = topdsn
+                  savevol = topvol
+                  savelib = 1
+                  end
+               call edit_copy mem nmem
+               if lmc_rc > 0 then return
+               mem = nmem
+               if savelib <> null then do
+                  stgcpy = 1
+                  end
+               end
+            end
+         if stgcpy <> 1 then
+            if savelib <> null then
+               if lib > savelib then do
+                  if savedsn <> null then
+                     if dsn <> savedsn then call edit_copy mem mem
+                  if dsn = savedsn then
+                     if vol <> savevol then call edit_copy mem mem
+                     end
+         if lmc_rc > 0 then return
+         if vol <> null then volume = "Volume("vol")"
+                        else volume = null
+         sc_rc = 0
+         if right(mem,1) <> stagesuf then
+            if copied = 0 then call Save_Copy
+         if sc_rc > 0 then return
+
+         Do_EditN:
+         if savedsn = null
+            then do
+                 dsn = topdsn
+                 vol = topvol
+                 lib = 1
+                 end
+            else dsn = savedsn
+         "Edit Dataset('"dsn"("mem")')" volume
+         erc = rc
+         if erc < 4 then do
+            if copied = 0 then
+               "Setmsg msg(slmsg001)"
+            else
+               "Setmsg msg(slmsg002)"
+            call get_stats mem
+            end
+         if copied = 1 then
+            if erc > 3 then
+              call delete_copy
+         return
+
+        /* ----------------------------------------------------- *
+         * Copy selected Member into desired save-to library     *
+         * ----------------------------------------------------- */
+         Edit_Copy:
+           arg memin memout
+           copied = 1
+           if vol <> null then volume = "Volume("vol")"
+           "Lminit dataid(edit) dataset('"dsn"')" volume
+           if savevol <> null then volume = "Volume("savevol")"
+           if savelib = null then
+              "Lminit dataid(saveto) dataset('"dsn"')" volume
+           else
+              "Lminit dataid(saveto) dataset('"savedsn"')" volume
+           "LmCopy Fromid("edit") Frommem("memin")",
+                 "ToDataid("saveto") ToMem("memout")"
+           lmc_rc = rc
+           if rc > 0 then do
+              copied = 0
+              smsg = zerrsm
+              lmsg = zerrlm
+              "Setmsg msg(slmsg021)"
+              end
+           "Lmfree dataid("edit")"
+           "Lmfree dataid("saveto")"
+           if savelib <> null then do
+              dsn    = savedsn
+              lib    = savelib
+              vol    = savevol
+              end
+           return
+
+        /* ----------------------------------------------------- *
+         * Delete the copied member from the save-to library     *
+         * since it wasn't edited/updated/saved                  *
+         * ----------------------------------------------------- */
+         Delete_Copy:
+           "Lminit dataid(del2) dataset('"dsn"')" volume "Enq(SHRW)"
+           "Lmopen dataid("del2") option(Output)"
+           "LmmDel Dataid("del2") Member("mem") NoEnq"
+           "Lmclose dataid("del2")"
+           "Lmfree dataid("del2")"
+           call Find_Member mem 'x'
+           if f_hit = 1 then do
+              "TBDelete slm"
+              "Setmsg msg(slmsg000)"
+              end
+           return
+
+        /* ----------------------------------------------------- *
+         * Delete the selected member since the user has asked   *
+         * and confirmed that it be deleted.                     *
+         * ----------------------------------------------------- */
+         Delete_Member:
+          "TBDelete slm"
+           dmem = mem
+           if vol <> null then volume = "Volume("vol")"
+           "Lminit dataid(del2) dataset('"dsn"')" volume "Enq(SHRW)"
+           "Lmopen dataid("del2") option(Output)"
+           "LmmDel Dataid("del2") Member("mem") NoEnq"
+           "LmClose dataid("del2")"
+           "Lmfree dataid("del2")"
+           "Setmsg msg(slmsg015)"
+           return
+
+        /* ----------------------------------------------------- *
+         * Save a copy of the member being edited                *
+         * ----------------------------------------------------- */
+         Save_Copy:
+           sc_rc = 0
+           if saveloc = 1 then
+              if length(mem) < 8 then
+                 mem = mem" "
+           len = length(mem)
+           Select
+          /* -------------------------- *
+           * 1: Switch last 2 chars     *
+           * -------------------------- */
+           When saveopt = 1 then do
+                omem   = mem
+                len    = length(strip(mem))
+                newmem = left(mem,len-2)
+                suf    = left(right(mem,2),1)
+                suf2   = right(mem,1)
+                newmem = newmem""suf2""suf
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * 2: Change 2nd to last to   *
+           *    savechar1               *
+           * -------------------------- */
+           When saveopt = 2 then do
+                omem   = mem
+                len = length(strip(mem))
+                newmem = overlay(savechar1,mem,len-1,1)
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * 3: Make last 2 chars 99    *
+           * -------------------------- */
+           When saveopt = 3 then do
+                omem   = mem
+                len = length(strip(mem))
+                newmem = left(mem,len-2)
+                newmem = newmem"99"
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * 4: save 2 copies           *
+           *    last char to            *
+           *    savechar1 for most      *
+           *        current             *
+           *    savechar2 for next      *
+           *        oldest              *
+           * -------------------------- */
+           When saveopt = 4 then do
+                n_mem  = left(mem,len-1)
+                omem   = n_mem""savechar1
+                newmem = n_mem""savechar2
+                call Do_Save_Copy
+                omem   = mem
+                newmem = n_mem""savechar1
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * 5: Save 2 copies           *
+           *    Change 2nd to last to   *
+           *    savechar1 for most      *
+           *        current             *
+           *    savechar2 for next      *
+           *        oldest              *
+           * -------------------------- */
+           When saveopt = 5 then do
+                len = length(strip(mem))
+                omem   = overlay(savechar1,mem,len-1,1)
+                newmem = overlay(savechar2,mem,len-1,1)
+                call Do_Save_Copy
+                omem   = mem
+                newmem = overlay(savechar1,mem,len-1,1)
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * 6: Save 4 copies           *
+           *    last char = 1 for most  *
+           *    recent and 4 for oldest *
+           * -------------------------- */
+           When saveopt = 6 then do
+                do mc = 4 to 2 by -1
+                   omem   = overlay(mc-1,mem,len,1)
+                   newmem = overlay(mc,mem,len,1)
+                   call Do_Save_Copy
+                   end
+                mem   = strip(mem)
+                omem  = mem
+                mc     = 1
+                newmem = overlay(mc,mem,len,1)
+                call Do_Save_Copy
+                end
+          /* -------------------------- *
+           * Default: Change last char  *
+           *          to Z              *
+           * -------------------------- */
+           Otherwise do
+                omem   = mem
+                newmem = left(mem,len-1)""savechar1
+                call Do_Save_Copy
+                end
+           end
+           return
+
+        /* ----------------------------------------------------- *
+         * Rename the requested member                           *
+         * ----------------------------------------------------- */
+         Do_Rename:
+           arg memin memout
+           if vol <> null then volume = "Volume("vol")"
+           "Lminit dataid(edit) dataset('"dsn"')" volume "Enq(SHRW)"
+           "Lminit dataid(edit2) dataset('"dsn"')" volume
+           "Lmopen dataid("edit") option(Output)"
+           "LmmDel Dataid("edit") Member("memout") NoEnq"
+           "LmmRen Dataid("edit") Member("memin")",
+              "Newname("memout") Noenq"
+           "Lmclose dataid("edit")"
+           x_rc = rc
+           savemem = mem
+           mem = memin
+           call Find_Member memin 'x'
+           if f_hit = 1 then do
+              "TBDelete slm"
+              end
+           mem = memout
+           zsel = null
+           call get_stats mem
+           call find_member mem 'x'
+           "Lmfree dataid("edit")"
+           "Lmfree dataid("edit2")"
+           return
+
+        /* ----------------------------------------------------- *
+         * Make the backup copies now                            *
+         * ----------------------------------------------------- */
+         Do_Save_Copy:
+           if vol <> null then volume = "Volume("vol")"
+                          else volume = null
+           "Lminit dataid(edit) dataset('"dsn"')" volume
+           "Lminit dataid(edit2) dataset('"dsn"')" volume
+           "LmCopy Fromid("edit") Frommem("omem")",
+                 "ToDataid("edit2") ToMem("newmem") Replace"
+           sc_rc = rc
+           if sc_rc > 0 then
+              if zerrsm = "Member not found" then sc_rc = 0
+           else do
+              smsg = zerrsm
+              lmsg = zerrlm
+              "Setmsg msg(slmsg021)"
+              return
+              end
+           "Lmfree dataid("edit")"
+           "Lmfree dataid("edit2")"
+           savemem = mem
+           mem = newmem
+           zsel = null
+           call find_member mem 'x'
+           if x_rc = 0 then
+           if f_hit = 1 then do
+              "TBDelete slm"
+              end
+           if x_rc = 0 then
+              call get_stats mem
+           mem = savemem
+           call find_member mem 'x'
+           return
+
+        /* ----------------------------------------------------- *
+         * get ispf stats for updated member                     *
+         * ----------------------------------------------------- */
+        get_stats:
+          arg gmem
+          call Find_Member gmem 'x'
+          if vol <> null then volume = "Volume("vol")"
+          "LMINIT DATAID(GSTATS) DATASET('"dsn"')" volume
+          "LMOPEN DATAID("gstats") OPTION(INPUT)"
+          "LMMFIND Dataid("GSTATS") Member("gmem") Stats(Yes)"
+          src = rc
+          if src > 0 then return 4
+          zsel = null
+          smem = mem
+          mem  = gmem
+          "TBAdd slm Order"
+          mem  = smem
+          "LMClose Dataid("gstats")"
+          "LMFree  Dataid("GSTATS")"
+          return
+
+        /* ----------------------------------------------------- *
+         * Build the ISPF Table subroutine                       *
+         * ----------------------------------------------------- */
+        build_table:
+        "TBCreate slm keys(mem lib)" ,
+           "Names(zsel zlvers zlmod zlc4date zlm4date zlmtime" ,
+                 "zlcdate zlmdate" ,
+                 "zlcnorc zlinorc zlmnorc zluser dsn vol dup)" ,
+                 "Nowrite Replace"
+        signal start
+        return
+
+        /* ----------------------------------------------------- *
+         * Use LMMLIST to get member list and add to table       *
+         * ----------------------------------------------------- */
+        get_mem:
+        lib = i
+        dlib = i
+        if length(vol) > 0 then volume = "VOLUME("vol")"
+                           else volume = null
+        "LMINIT DATAID(STATUS) DATASET('"dsn"')" volume
+        "LMOPEN DATAID("STATUS") OPTION(INPUT)"
+        mem    = " "
+        do forever
+           if length(imem) = 0 then
+             "LMMLIST Dataid("status") OPTION(LIST) MEMBER(mem) STATS(YES)"
+           else
+             "LmmList Dataid("status") Option(List) Member(mem)",
+                     "Pattern("imem") Stats(yes)"
+           lrc = rc
+           if lrc > 3 then leave
+           mem = strip(mem)
+           if pos(mem,members) > 0 then dup = 1
+                                   else dup = 0
+           members = members mem
+           "TBAdd slm" first_add
+           first_add = null
+           memnum = memnum + 1
+           popmsg1 = "Adding members for library:"
+           if volume <> null then
+              popmsg2 = left(dsn,44) volume
+           else
+              popmsg2 = dsn
+           popmsg3 = "Counter: " memnum "of" total
+           if right(memnum,1) = 0 then do
+              "Control Display Lock"
+              "Addpop column(11) row(3)"
+              "Display Panel(slmpop)"
+              "Rempop"
+              end
+           x_rc = rc
+        end
+        "LMClose Dataid("status")"
+        "LMFree  Dataid("status")"
+        return
+
+        /* ----------------------------------------------------- *
+         * Process any commands                                  *
+         * ----------------------------------------------------- */
+        Do_Zcmd:
+         parse value zcmd with cmd opt
+         cmd = translate(cmd)
+         if cmd = "S" then cmd = "B"
+         Select
+        /* ----------------------------------------------------- *
+         * Test for ACTIVE Command and process                   *
+         * ----------------------------------------------------- */
+           When Abbrev("ACTIVE",zcmd,3) = 1 then do
+                "TBEnd slm"
+                all = 0
+                call build_table
+                end
+        /* ----------------------------------------------------- *
+         * Test for All command and process                      *
+         * ----------------------------------------------------- */
+           When Abbrev("ALL",zcmd,2) = 1 then do
+                "TBEnd slm"
+                all = 1
+                call build_table
+                end
+        /* ----------------------------------------------------- *
+         * Test for BROWSE Command                               *
+         * ----------------------------------------------------- */
+           When Abbrev("BROWSE",cmd,1) = 1 then do
+                call find_member opt 'x'
+                if f_hit = 1 then do
+                   "TBTop slm"
+                   "TBSkip slm Number("rowcrp")"
+                   "Control Display Save"
+                   "Browse Dataset('"dsn"("mem")')" volume
+                   "Control Display Restore"
+                   end
+                else do
+                   smsg = "Error"
+                   lmsg = opt "Member not found for BROWSE."
+                   "Setmsg Msg(slmsg021)"
+                   end
+                return
+                end
+        /* ----------------------------------------------------- *
+         * Test for Cancel command                               *
+         * ----------------------------------------------------- */
+           When zcmd = "CANCEL" then do
+                "TBEnd slm"
+                signal do_local
+                end
+        /* ----------------------------------------------------- *
+         * Test for Duplicate command and process                *
+         * ----------------------------------------------------- */
+           When Abbrev("DUPLICATE",zcmd) = 1 then do
+                "TBEnd slm"
+                all = 2
+                call build_table
+                end
+        /* ----------------------------------------------------- *
+         * Test for EDIT Command                                 *
+         * ----------------------------------------------------- */
+           When Abbrev("EDIT",cmd,1) = 1 then do
+                call find_member opt 'x'
+                if f_hit = 1 then do
+                   "TBTop slm"
+                   "TBSkip slm Number("rowcrp")"
+                   call do_edit
+                   end
+                else do
+                     mem = opt
+                     call do_edit
+                     end
+                return
+                end
+        /* ----------------------------------------------------- *
+         * Test for FILTER command and process                   *
+         * ----------------------------------------------------- */
+           When Abbrev("FILTER",word(zcmd,1),3) = 1 then do
+                parse value zcmd with . imem
+                if length(imem) > 0 then
+                   if length(imem) < 8
+                      then imem = imem"*"
+                "TBEnd slm"
+                call build_table
+                end
+        /* ----------------------------------------------------- *
+         * Test for New Command                                  *
+         * ----------------------------------------------------- */
+           When Abbrev("NEW",cmd,1) = 1 then do
+               if opt = null then do
+                  smsg = "Error"
+                  lmsg = "No member name specified - try again."
+                  "Setmsg Msg(slmsg021)"
+                  return
+                  end
+                call find_member opt 'x'
+                if f_hit = 1 then do
+                   "TBTop slm"
+                   "TBSkip slm Number("rowcrp")"
+                   smsg = "Error"
+                   lmsg = opt "Member already exists and is not New."
+                   "Setmsg Msg(slmsg021)"
+                   return
+                   end
+                else do
+                     mem = opt
+                     cmd = "NEW"
+                     call do_edit
+                     end
+                return
+                end
+        /* ----------------------------------------------------- *
+         * Test for REFRESH Command and process                  *
+         * ----------------------------------------------------- */
+           When Abbrev("REFRESH",zcmd,3) = 1 then do
+                "TBEnd slm"
+                call build_table
+                end
+        /* ----------------------------------------------------- *
+         * Test for REPORT Command and process                   *
+         * ----------------------------------------------------- */
+           When Abbrev("REPORT",zcmd,3) = 1 then call do_report
+        /* ----------------------------------------------------- *
+         * Test for SORT command and process                     *
+         * ----------------------------------------------------- */
+           When cmd = "SORT" then do
+              sort = null
+              src = 0
+              do is = 1 to words(opt)
+                 s = word(opt,is)
+                 parse value s with s1 "," s2
+                 if s2 <> null then s2 = ",c,"s2
+                               else s2 = ",c,a"
+                 sortopt = 0
+                 Select
+                   When Abbrev("NAME",s1) = 1 then do
+                        s1 = "Mem"
+                        sortopt = 1
+                        end
+                   When Abbrev("LIB",s1) = 1 then s1 = "lib"
+                   When s1 = "VV" then s1 = "zlvers"
+                   When s1 = "MM" then s1 = "zlmod"
+                   When Abbrev("CREATED",s1) = 1 then s1 = "zlc4date"
+                   When Abbrev("CHANGED",s1) = 1 then do
+                        s1 = "zlm4date"s2 "zlmtime"
+                        end
+                   When Abbrev("SIZE",s1) = 1 then s1 = "zlcnorc"
+                   When Abbrev("INIT",s1,2) = 1 then s1 = "zlinorc"
+                   When s1 = "MOD" then s1 = "zlmnorc"
+                   When s1 = "ID" then s1 = "zluser"
+                   otherwise do
+                             "Setmsg msg(slmsg009)"
+                             src = 4
+                             sortopt = 0
+                             end
+                   end
+                   sort = strip(sort s1""s2)
+                 end
+              if src = 0 then
+                 "TBSort slm Fields("sort")"
+              end
+        /* ----------------------------------------------------- *
+         * Test for LOCATE command and process                   *
+         * ----------------------------------------------------- */
+           When cmd = "L" then do
+              "TBTop slm"
+              ast_mem = null
+              fmem = translate(opt)
+              if pos("*",fmem) > 0 then do
+                ast_mem = fmem
+                 x = pos("*",fmem)
+                 fmem = left(fmem,x-1)
+                 end
+              flen = length(fmem)
+              do forever
+                 "TBSkip slm number(1) Position(crp)"
+                 if rc > 0 then leave
+                 if fmem <= left(mem,flen) then leave
+                 end
+              mult_sels = 0
+              zcmd = null
+              if rc > 4 then "Setmsg msg(slmsg003)"
+                        else do
+                             if fmem = mem then do
+                                "Setmsg msg(slmsg004)"
+                                rowcrp = crp
+                                end
+                             else do
+                                if ast_mem <> null then
+                                   fmem = ast_mem
+                                   rowcrp = 0
+                                   "Setmsg msg(slmsg005)"
+                                end
+                             end
+              end
+           otherwise "Setmsg msg(slmsg006)"
+           end
+        return
+
+        /* ----------------------------------------------------- *
+         * Test for New member before doing edit                 *
+         * Do our own scan so as to find near matches.           *
+         * ----------------------------------------------------- */
+         Find_Member: Procedure expose crp save_crp rowcrp ,
+                      null f_hit
+         arg tmem topt
+         save_crp = crp
+         "TBTop slm"
+         frc = 0
+         f_hit = 0
+         crp = 0
+         mem = null
+         do forever
+            if frc > 0 then leave
+            "TBSkip slm number(1) Position(crp)"
+            frc = rc
+            if mem > tmem then frc = 1
+            if tmem = mem then do
+               rowcrp = crp
+               f_hit = 1
+               frc   = 1
+               if topt = null then do
+                  crp = save_crp
+                  "Setmsg msg(slmsg008)"
+                  end
+            end
+         end
+         return
+
+        /* ----------------------------------------------------- *
+         * Move the designated member from library 1 to          *
+         * library 2 by:                                         *
+         * a) renaming existing member in library 2 as defined   *
+         * b) move member from library 1 to library 2            *
+         * c) update the table with this information             *
+         * ----------------------------------------------------- */
+         Do_Move:
+         /* make backup copies */
+         parse value parm.2 with dsn '/' vol '/' sopt
+         dsn = strip(dsn)
+         vol = strip(vol)
+         move_mem = mem
+         "TBDelete slm"
+         lib      = 2
+         call save_copy
+         if sc_rc > 0 then return
+
+         /* reset mem and do the move */
+         mem = move_mem
+         parse value parm.1 with dsn1 '/' vol1 '/' sopt
+         dsn1 = strip(dsn1)
+         vol1 = strip(vol1)
+         if vol  <> null then volume  = "Volume("vol")"
+                         else volume = null
+         if vol1 <> null then volume1 = "Volume("vol1")"
+                         else volume1 = null
+
+         "Lminit dataid(from) dataset('"dsn1"')" volume1
+         "Lminit dataid(to) dataset('"dsn"')" volume
+         "LmMove Fromid("from") Frommem("mem")",
+               "ToDataid("to") Replace"
+         x_rc = rc
+         "Lmfree dataid("from")"
+         "Lmfree dataid("to")"
+         lib = 2
+         call get_stats mem
+         "Setmsg msg(slmsg019)"
+         return
+
+        /* ----------------------------------------------------- *
+         * Use the IBM ISPF Compare Utility                      *
+         * ----------------------------------------------------- */
+         Do_Compare:
+         Address TSO
+         call msg 'off'
+         "Free f(sysin)"
+           if vol = null then
+              "Alloc f(newdd) shr reuse ds('"dsn"("mem")')"
+           else
+              "Alloc f(newdd) shr reuse ds('"dsn"("mem")')",
+                 "vol("vol") unit(sysallda)"
+            if cvol <> null then cvolume = "vol("cvol") unit(sysallda)"
+                            else cvolume = null
+           "Alloc f(olddd) shr reuse ds("cpdsn")" cvolume
+           "Alloc f(outdd) unit(sysda) spa(1,1) tr reuse"
+           Address ISPExec
+           "Control Errors Return"
+           if cps = "Yes" then seq = "SEQ"
+                          else seq = "NOSEQ"
+           "Select PGM(isrsupc)",
+                           "Parm(DELTAL,LINECMP,"seq")"
+           compare_rc = rc
+           Address TSO
+           "Execio * diskr outdd (finis stem cpr."
+           Address ISPExec
+           "Lminit dataid(cpr) ddname(outdd)"
+           "Browse dataid("cpr")"
+           "Lmfree dataid("cpr")"
+           Address TSO,
+              "Free f(olddd newdd outdd)"
+           smsg = "Complete"
+           lmsg = "Compare completed."
+           "Setmsg Msg(slmsg021)"
+           return
+
+        /* ----------------------------------------------------- *
+         * Do_Local:                                             *
+         *    Support a local set of datasets that are user      *
+         *    defined.                                           *
+         * ----------------------------------------------------- */
+         Do_Local:
+        /* ----------------------------------------------------- *
+         * Ask the user for the list of libraries to use         *
+         * ----------------------------------------------------- */
+         if open_flag <> 1 then do
+            if "OK" <> sysdsn(slmpds) then do
+            Address TSO "Alloc f(slmpds) new reuse ds("slmpds")",
+                        "recfm(f b) lrecl(80) blksize(6160)",
+                        "dir(12)" ,
+                        "tr spa(15,15)"
+                    Address TSO "Free f(slmpds)"
+                    end
+            "Libdef slmlib dataset id("slmpds") stack"
+            "TBOpen slmlibs Write Library(slmlib)"
+            orc = rc
+            if orc = 0 then do
+               p_rc = 0
+               "TBTop slmlibs"
+               do until p_rc > 0
+                  "TBSkip slmlibs"
+                  p_rc = rc
+                  if p_rc = 0 then
+                     if tblname = "PARMLIB" then do
+                        "TBDelete slmlibs"
+                        p_rc = 4
+                        end
+                  end
+               end
+           if orc = 0 then
+              if nosys = 0 then do
+                 if plib <> null then do
+                    tblname = plib
+                    tbldesc = plib dynamtbl
+                    end
+                 else do
+                      tblname = "PARMLIB"
+                      tbldesc = "System Parmlibs" dynamtbl
+                      end
+                 "TBadd slmlibs"
+                 end
+            if orc > 8 then do
+               smsg = zerrsm
+               lmsg = zerrlm
+               "Setmsg Msg(slmsg021)"
+               "Libdef slmlib"
+               exit 4
+               end
+            if orc = 8 then do
+               "TBCreate slmlibs keys(tblname)" ,
+                         "names(tbldesc) replace Library(slmlib)"
+               if nosys = 0 then do
+                 if plib <> null then do
+                    tblname = plib
+                    tbldesc = plib dynamtbl
+                    end
+                 else do
+                      tblname = "PARMLIB"
+                      tbldesc = "System Parmlibs" dynamtbl
+                      end
+                  "TBadd slmlibs"
+                  end
+               "TBSave slmlibs Library(slmlib)"
+               end
+            end
+         open_flag = 1
+         crp    = 1
+         rowcrp = 0
+         src    = 0
+         hit    = 0
+         ztdsels = 0
+
+        /* ------------------------------------------------ *
+         * Display the Table List of Library Concatenations *
+         * ------------------------------------------------ */
+         do forever
+            if hit > 0 then leave
+            if plib = null then do
+               zsel = null
+               "TBSort slmlibs Fields(tblname)"
+               if ztdsels = 0 then do
+                  "TBTop slmlibs"
+                  "TBSkip slmlibs Number("crp")"
+                  if rowcrp = 0 then
+                     "TBDispl slmlibs Panel(slmlocal)"
+                  else
+                     "TBDispl slmlibs Panel(slmlocal)" ,
+                             "Csrrow("rowcrp") autosel(no)" ,
+                             "Cursor(zsel)"
+                  end
+               else
+                  "TBDispl slmlibs"
+               t_rc = rc
+               if t_rc > 7 then zcmd = "CANCEL"
+               end
+
+            if plib <> null then
+               if plib_pass = null then do
+                  "TBTop  slmlibs"
+                  "TBSkip slmlibs"
+                  "TBGet  slmlibs"
+                  zsel = "S"
+                  zcmd = null
+                  plib_pass = 1
+                  end
+             else zcmd = "CANCEL"
+
+            parse value zcmd with zcmd zparm
+            select
+            when zcmd = "REPORT" then call do_report
+            when zcmd = "ADD" then
+                 Select
+                 When zparm = null then do
+                        smsg = "Error"
+                        lmsg = "ADD requires a DDname as its" ,
+                               "only required parameter." ,
+                               "e.g. add ddname"
+                        "Setmsg Msg(slmsg021)"
+                    end
+                  When zparm = "JES2" then
+                         if nosys <> 0 then do
+                            smsg = "Error"
+                            lmsg = "Add JES2 is not support",
+                                   "with the NOSYS invocation",
+                                   "of SLM."
+                             "Setmsg Msg(slmsg021)"
+                            end
+                         else do
+                         work = slmj2prc(j2proc 'x')
+                         do jw = 1 to words(work)
+                            ddinfo  = word(work,jw)
+                            ddinfo = translate(ddinfo,' ','/')
+                            parse value ddinfo with zparm ddinfo
+                            tblname = zparm
+                            if right(tblname,3) = "MST" then
+                              tbldesc = "MSTRJCL PROC" dynamtbl
+                            else
+                              tbldesc = "JES2 PROC" dynamtbl
+                            "TBadd slmlibs"
+                            open_tables = open_tables zparm
+                            "TBCreate" zparm ,
+                                  "names(ldsn lvol sopt)"
+                            parse value "" with lvol sopt
+                            do tds = 1 to words(ddinfo)
+                               ldsn = word(ddinfo,tds)
+                               "TBAdd" zparm
+                               end
+                            end
+                           end
+                        Otherwise do
+                            ddinfo = null
+                            call get_ddinfo zparm
+                            if ddinfo.0  = 0 then do
+                               smsg = "Error"
+                               lmsg = "Requested DDname:" zparm ,
+                                      "is not allocated or does not"
+                                      "reference any valid datasets."
+                               "Setmsg Msg(slmsg021)"
+                               end
+                            else do
+                                 tblname = zparm
+                                 tbldesc = zparm dynamtbl,
+                                        "for" sysvar('sysuid')
+                                 "TBadd slmlibs"
+                                 open_tables = open_tables zparm
+                                 "TBCreate" tblname ,
+                                       "names(ldsn lvol sopt)"
+                                 parse value "" with lvol sopt
+                                 do tds = 1 to ddinfo.0
+                                    ldsn = "'"word(ddinfo.tds,1)"'"
+                                    lvol = word(ddinfo.tds,2)
+                                    "TBAdd" tblname
+                                    end
+                                 drop ddinfo.
+                                 end
+                            end
+                 end
+            when zcmd = "CANCEL" then do
+                 "TBEnd slmlibs"
+                 end
+            When abbrev("INSERT",zcmd,1) = 1 then do
+                 "TBBottom slmlibs"
+                 "TBVClear slmlibs"
+                 if zparm <> null then
+                    dsn = zparm
+                 zcmd = null
+                 "Display Panel(slmtp)"
+                 if rc = 0 then do
+                    "TBadd slmlibs"
+                    end
+                 rowcrp = 0
+                 end
+            When zsel = "S" then do
+                 hit    = 1
+                 parse value "" with topdsn topvol zsel
+                 end
+            When zsel = "D" then
+                 if tblname <> "PARMLIB" then do
+                    "TBDelete slmlibs"
+                    "TBErase" tblname "Library(slmlib)"
+                 end
+            When zsel = "I" then do
+                 "TBVClear slmlibs"
+                 "TBQuery slmlibs Position(rowcrp)"
+                 zcmd = null
+                 "Display Panel(slmtp)"
+                 if rc = 0 then do
+                    "TBadd slmlibs"
+                    end
+                 rowcrp  = 0
+                 ztdsels = 0
+                 "TBTop slmlibs"
+                 end
+            When zsel = "R" then do
+                 "TBadd slmlibs"
+                 end
+            When ztdsels > 0 then nop
+            When length(strip(zsel||zcmd)) = 0 then nop
+            Otherwise do
+                      m_type = null
+                      if zsel <> null then
+                         m_type = "Invalid Selection" zsel
+                      if zcmd <> null then
+                         m_type =  "Invalid Command" zcmd
+                      smsg = "Error"
+                      lmsg = "An" m_type "was entered."
+                      "Setmsg Msg(slmsg021)"
+                      end
+            end
+
+         if hit <> 1 then do
+            if open_tables <> null then do
+               do ot = 1 to words(open_tables)
+                  "TBEnd" word(open_tables,ot)
+                  end
+               "TBTop slmlibs"
+               do forever
+                  "TBSkip slmlibs"
+                  if rc > 0 then leave
+                  if wordpos(tblname,open_tables) > 0 then
+                     "TBDelete slmlibs"
+                  end
+               end
+            "TBClose slmlibs replcopy Library(slmlib)"
+            "Libdef slmlib"
+            exit
+            end
+         end
+
+        /* ----------------------------------------------------- *
+         * Call the slmlocal exec to get the dataset names       *
+         * ----------------------------------------------------- */
+        /* ----------------------------------- *
+         * If Passed Lib (PLIB) then define it *
+         * ----------------------------------- */
+         if plib <> null then do
+            ddinfo = null
+            call get_ddinfo plib
+            tblname = plib
+            tbldesc = plib  dynamtbl,
+                   "passed library"
+            "TBadd slmlibs"
+            open_tables = open_tables plib
+            "TBCreate" tblname ,
+                  "names(ldsn lvol sopt)"
+            parse value "" with lvol sopt
+            do tds = 1 to ddinfo.0
+               ldsn = "'"word(ddinfo.tds,1)"'"
+               lvol = word(ddinfo.tds,2)
+               "TBAdd" tblname
+               end
+            drop ddinfo.
+            end
+
+         if tblname <> "PARMLIB" then do
+            dsns    = slmlocal(tblname)
+            if dsns = null then signal do_local
+            libt    = tblname
+            end
+         else do
+              libt = "PARMLIB"
+             /* --------------------------------------------- *
+              * Call slmrexxf function to get parmlib dsnames *
+              * --------------------------------------------- */
+              if plib = null then do
+                 call slmrexxf 'parm.'
+                 dsns = null
+                 do i = 1 to parm.0
+                    parse value parm.i with p1 "/" p2
+                    dsns = dsns strip(p1) p2 "\"
+                    end
+                 end
+              else do
+                   dsns = slmlocal(plib)
+                   if dsns = null then signal do_local
+                   end
+              end
+
+        /* ----------------------------------------------------- *
+         * Now process the datasets into a stem variable to use  *
+         * ----------------------------------------------------- */
+         dsnc = 0
+         do forever
+            parse value dsns with dsn "\" dsns
+            if length(dsn) = 0 then leave
+            parse value dsn with dsn '/' vol '/' sopt
+            dsn = strip(dsn)
+            if tblname <> "PARMLIB" then
+               if left(dsn,1) = "'"
+                  then dsn = substr(dsn,2,length(dsn)-2)
+                  else dsn = sysvar("syspref")"."dsn
+            dsnc = dsnc + 1
+            parm.dsnc = dsn '/' vol '/' sopt
+            end
+         parm.0 = dsnc
+         drop dsns dsnc dsn vol
+         imem = null
+         signal start0
+
+        /* ----------------------------------------------------- *
+         * Fixup volser found with system symbolics              *
+         * ----------------------------------------------------- */
+         Fix_volsym: Procedure
+           arg volser
+           if left(volser,1) <> "&" then return volser
+           volser = right(volser,length(volser)-1)
+           volser = mvsvar('symdef',volser)
+           return volser
+
+        /* ----------------------------------------------------- *
+         * Fixup dsname found with system symbolics              *
+         * ----------------------------------------------------- */
+         Fix_dsnsym: Procedure
+           arg dsname
+           if pos("&",dsname) = 0 then return dsname
+           parse value dsname with . '&' symbol '.' .
+           if pos("&",symbol) > 0 then
+              parse value dsname with symbol '&' .
+           p1 = pos("&"symbol,dsname)
+           p1l = length(symbol)
+           newdsnl = left(dsname,p1-1)
+           p1r = p1l + p1
+           newdsnr = right(dsname,length(dsname)-p1r)
+           if left(newdsnr,2) = ".." then
+              newdsnr = substr(newdsnr,2)
+           newdsn = newdsnl""mvsvar('symdef',symbol)""newdsnr
+         return newdsn
+
+        /***********************************************************************
+        * Trap uninitialized variables                                         *
+        ***********************************************************************/
+        Novalue:
+
+        Say "Variable" condition("Description") "undefined in line" sigl":"
+        Say sourceline(sigl)
+        Say "Contact systems support about this error."
+        Exit 16
+
+        /* --------------------  rexx procedure  -------------------- *
+         * Name:      slmlocal                                        *
+         *                                                            *
+         * Function:  Allow Local datasets for use in the SLM         *
+         *            application.                                    *
+         *                                                            *
+         *            Invoked from SLM as a local function            *
+         *                                                            *
+         *            dsns returned via rexx return variable          *
+         *                                                            *
+         * ---------------------------------------------------------- */
+         SLMLocal: Procedure expose tbldesc dynamtbl
+         arg tblname
+         parse value "" with return_info null
+         if pos(dynamtbl,tbldesc) = 0 then do
+            "TBOpen" tblname "Write Library(slmlib)"
+            if rc = 8 then do
+               "TBCreate" tblname ,
+                         "names(ldsn lvol sopt) replace" ,
+                         "Library(slmlib)"
+               "TBVClear" tblname
+               "TBadd"    tblname
+               end
+            end
+            mult_sels = 0
+            crp = 1
+            rowcrp = 1
+            src    = 0
+            ztdsels = 0
+
+            do forever
+               zsel = null
+               if mult_sels = 0 then do
+                 "TBTop" tblname
+                 "TBSkip" tblname "Number("crp")"
+                 if rowcrp = 0 then
+                    "TBDispl" tblname "Panel(slmtbl)"
+                 else
+                    "TBDispl" tblname "Panel(slmtbl)" ,
+                            "Csrrow("rowcrp") autosel(no)" ,
+                            "Cursor(zsel)"
+                 end
+               else
+                 "TBDispl" tblname
+               t_rc = rc
+               mult_sels = ztdsels
+               if t_rc > 7 then leave
+               parse value zcmd with zcmd zparm
+               select
+               when zcmd = "CANCEL" then do
+                    "TBEnd" tblname
+                    return_info = null
+                    signal exit
+                    end
+                 When abbrev("INSERT",zcmd,1) = 1 then do
+                      "TBBottom" tblname
+                      "TBVClear" tblname
+                      if zparm = null then zparm = 1
+                      if zparm <> null then do
+                         if datatype(zparm) <> "NUM" then do
+                            ldsn = zparm
+                            "TBadd" tblname
+                            end
+                         end
+                      if datatype(zparm) = "NUM" then
+                         do ta = 1 to zparm
+                            "TBadd" tblname
+                            end
+                      "TBQuery" tblname "rownum(rowcrp)"
+                      end
+                 When zsel = "D" then do
+                      "TBDelete" tblname
+                      end
+                 When left(zsel,1) = "I" then do
+                      "TBVClear" tblname
+                      "TBQuery" tblname "Position(rowcrp)"
+                      "TBadd" tblname
+                      rowcrp = rowcrp + 1
+                      mult_sels = 0
+                      end
+                 When zsel = "R" then do
+                      "TBadd" tblname
+                      end
+                 When zsel = null then do
+                      "TBPut" tblname
+                      if ldsn <> null then do
+                         call test_file ldsn lvol
+                         "TBPut" tblname
+                         end
+                      end
+                 Otherwise do
+                           if zsel <> null then
+                              m_type = "Invalid Selection" zsel
+                           if zcmd <> null then
+                              m_type =  "Invalid Command" zcmd
+                           zedsmsg = "Error"
+                           zedlmsg = "An" m_type "was entered."
+                           "Setmsg Msg(isrz001)"
+                           end
+               end
+            end
+            "TBTop" tblname
+            do forever
+              "TBSkip" tblname
+              if rc > 7 then leave
+              if ldsn = null then
+                 "TBDelete" tblname
+              else return_info = return_info ldsn '/' lvol '/' sopt "\"
+              end
+         if pos(dynamtbl,tbldesc) = 0 then
+            "TBClose" tblname "Replcopy Library(slmlib)"
+            exit:
+            return return_info
+
+        /* ----------------------------------------------------- *
+         * Test file for existence                               *
+         * ----------------------------------------------------- */
+         test_file:
+         arg file_dsn file_vol
+         file_dsn = fix_dsnsym(file_dsn)
+         file_vol = fix_volsym(file_vol)
+         if file_vol = null then
+            if sysdsn(file_dsn) = "OK" then do
+            call listdsi file_dsn
+            ldsn = "'"sysdsname"'"
+            return
+            end
+         else do
+              if left(file_dsn,1) <> "'" then
+                 if sysdsn("'"file_dsn"'") = "OK"
+                    then do
+                         ldsn = "'"file_dsn"'"
+                         return
+                         end
+              end
+         else do
+              call listdsi file_dsn "Volume("file_vol")"
+              if sysreason+0 = 0 then return
+              if left(file_dsn,1) <> "'" then do
+                 call listdsi "'"file_dsn"' Volume("file_vol")"
+                 if sysreason+0 = 0 then do
+                    ldsn = "'"file_dsn"'"
+                    return
+                    end
+                 end
+              end
+         zedsmsg = "DSN Error"
+         zedlmsg = file_dsn "Not found or invalid"
+         "Setmsg msg(isrz001)"
+         return
+
+        /* ----------------------------------------------------- *
+         * Fixup volser found with system symbolics              *
+         * ----------------------------------------------------- */
+         Fix_volsym: Procedure
+           arg volser
+           if left(volser,1) <> "&" then return volser
+           volser = right(volser,length(volser)-1)
+           volser = mvsvar('symdef',volser)
+           return volser
+
+        /* ----------------------------------------------------- *
+         * Fixup dsname found with system symbolics              *
+         * ----------------------------------------------------- */
+         Fix_dsnsym: Procedure
+           arg dsname
+           if pos("&",dsname) = 0 then return dsname
+           parse value dsname with . '&' symbol '.' .
+           if pos("&",symbol) > 0 then
+              parse value dsname with symbol '&' .
+           p1 = pos("&"symbol,dsname)
+           p1l = length(symbol)
+           newdsnl = left(dsname,p1-1)
+           p1r = p1l + p1
+           newdsnr = right(dsname,length(dsname)-p1r)
+           if left(newdsnr,2) = ".." then
+              newdsnr = substr(newdsnr,2)
+           newdsn = newdsnl""mvsvar('symdef',symbol)""newdsnr
+           return newdsn
+
+        /* --------------------------- *
+         * Generate and Display Report *
+         * --------------------------- */
+         Do_Report:
+          "Control Display Save"
+          if nosys = 1 then
+            "Select cmd(%slmrpt "ver" nosys)"
+          else
+            "Select cmd(%slmrpt "ver ")"
+          "Control Display Restore"
+          return
+
+        /* ------------------------------------------------------- *
+         * Get_DDInfo routine calls the SLMDDQ assembler routine   *
+         * passing a stem name and the ddname.                     *
+         *                                                         *
+         * The return is the stem containing the dsname and volser *
+         * for each dsname in the DD concatenation.                *
+         * ------------------------------------------------------- */
+         Get_DDInfo: Procedure expose ddinfo.
+            arg ddname
+            ddinfo.0 = 0
+            x = slmddq("ddinfo.",ddname)
+            return

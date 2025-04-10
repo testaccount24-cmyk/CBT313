@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(output) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++------------------------% TSO/E-Mail LOG Processing +--------------------------
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+%
++Command Options: %NEW    %S+log    %C+log     %RENumber+Renumber log entries
++Line Options:    %S+Select Log %I+Information %C+Change
++
+%Sel  %Log #  Log Description
++
+)Model
+@z   +!z  +  !z
+)Init
+  .HELP = TMLOGH2
+  .ZVARS = '(ZSEL LOGNUM LOGDESC)'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+  Ver (&zsel,list,S,I,C)
+)End

@@ -1,0 +1,29 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬Forward`option is used to resend the message and any
+`      accompanying file to another user or users.  This option interfaces
+`      to the SENDMAIL command and will copy in full the original message
+`      into the message text edit area of the new message so that you can
+`      add or change the original message before sending it.
+`
+`      The¬Print`option will display a selection menu of the available
+`      ISPF dialogs for printing on various types of printers.  See the
+`      tutorial for each of those dialogs for more specific information
+`      on the requirements for printing on the different printers.
+`      This option will only print the message and not the accompanying
+`      data set.
+`
+`      The¬C`option will allow you to change the Subject of a message and
+`      it's status to clarify it for later retrieval.
+)End

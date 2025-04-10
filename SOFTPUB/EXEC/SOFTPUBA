@@ -1,0 +1,191 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPUBA                                           *
+         *                                                               *
+         * Function:  Administration front-end for Rockwell ISPF         *
+         *            BookManager/Read for MVS for Application.          *
+         *                                                               *
+         * Syntax:    %SOFTPUBA option(s)                                *
+         *                                                               *
+         *            Valid options:                                     *
+         *                                                               *
+         *            BUILD  -  builds the selection tables and saves    *
+         *                      the updated tables in a work data set    *
+         *                      which must then be copied into the       *
+         *                      production data set using PDF 3.3        *
+         *                                                               *
+         *                      Calls SOFTPBB rexx procedure             *
+         *                                                               *
+         *            DEBUG   - Invoke Rexx tracing for debugging        *
+         *                                                               *
+         *            TEST    - Invoke using DISPLAY and using the       *
+         *                      newly built tables in the BUILD          *
+         *                      library                                  *
+         *            ACCESS  - Used with TEST to specify a test         *
+         *                      department/group                         *
+         *                                                               *
+         *            Default(s);  none -                                *
+         *                                                               *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *                                                               *
+         * ------------------------------------------------------------- */
+        arg options
+
+        if wordpos("DEBUG",options) > 0 then do
+           trace i
+           debug = "on"
+           end
+           else debug = ""
+
+        Address ISPEXEC "VGET ZAPPLID"
+          if zapplid <> "EOXR" then do
+             Address ISPEXEC "Select CMD(",
+                sysvar('sysicmd') options ") Newappl(EOXR)"
+             Exit 0
+             end
+
+        null        = ""
+        test_access = null
+        this_user   = sysvar(sysuid)
+        admin_users = "SYSLBD Lionel Dyck"
+
+        call test_admin
+
+        Display_Selection:
+        re_do = ""
+        if length(options) = 0 then do
+           parse value "" with zcmd test
+           Address ISPEXEC "Display Panel(SOFTPUBA)"
+           if rc > 4 then exit 0
+           do_pan = "on"
+           select
+             when zcmd = "1" then options = "BUILD"
+             when zcmd = "2"  then do
+                Address TSO,
+                  "%SOFTPUBX"
+                  re_do = "on"
+                  end
+             when zcmd = "3"  then  do
+                  options = "TEST"
+                  if length(panacc) <> null then
+                     options = options "ACCESS" panacc
+                  end
+             when zcmd = "4"  then options = "COPY"
+             when zcmd = "5"  then do
+                  Address ISPEXEC,
+                   "Select CMD(%SOFTPES)"
+                  re_do = "on"
+                  end
+             when zcmd = "6"  then do
+                  Address TSO "%SOFTPscl"
+                  signal exit_risoft
+                  end
+             when zcmd = "7"  then do
+                  Address TSO,
+                     "%SOFTPDFT"
+                  Address ISPEXEC,
+                     "VGET (BUILD PROD)"
+                  Address ISPEXEC,
+                     "Edit Dataset("build")"
+                  re_do = "on"
+                  end
+             when zcmd = "8"  then do
+                Address TSO,
+                  "%BKINDEX"
+                  re_do = "on"
+                  end
+             when zcmd = "9"  then do
+                Address TSO,
+                  "%SOFTPUSD"
+                  re_do = "on"
+                  end
+             otherwise re_do = "on"
+             end
+           end
+
+        if re_do = "on" then signal Display_Selection
+
+        Address ISPEXEC
+
+        /* ------------------------------------------------------------- *
+         * Establish working defaults for use during this application:   *
+         *                                                               *
+         * admin_users     = list of valid userids that may perform      *
+         *                   the BUILD function.                         *
+         * this_user       = userid of the currently active user.        *
+         * build_table     = data set into which the BUILD selection     *
+         *                   tables will be stored.                      *
+         * prod_table      = data set for the production DISPLAY         *
+         *                   selection tables.                           *
+         * ------------------------------------------------------------- */
+
+        Address TSO "%SOFTPDFT"
+        "VGET (BUILD PROD)"
+
+        build_table = build
+        prod_table  = prod
+
+        if wordpos("BUILD",options) > 0 then do
+           /* perform validation of authorized build users */
+           "Select CMD(",
+              "%SOFTPBB" build_table prod_table debug ")"
+              Signal Exit_RISoft
+        end
+
+        if wordpos("COPY",options) > 0 then do
+           /* perform validation of authorized build users */
+           "Select CMD(",
+              "%SOFTPBC" build_table prod_table debug ")"
+              Signal Exit_RISoft
+        end
+
+        if wordpos("TEST",options) > 0 then do
+           test = "on"
+           prod_table = build_table
+           end
+
+        if wordpos("ACCESS",options) > 0 then do
+           parse value options with . "ACCESS" test_access .
+           test_access = "%" test_access
+           if test <> "on" then do
+                   smsg = null
+                   lmsg = "Error:  ACCESS specified but you have not",
+                          "requested the TEST option. Try again."
+                   Signal Exit_RISoft
+                   end
+           end
+
+        "Select Cmd(%SOFTPUB PRIME ><" prod_table "SOFTCOPY" debug test_access,
+                   ") Newpool"
+
+        Exit_Risoft:
+           if do_pan = "on" then do
+              options = ""
+              signal display_selection
+              end
+          address ISPEXEC,
+              "VPUT (SMSG LMSG)"
+          address ISPEXEC,
+              "Setmsg Msg(SOFTP000)"
+           Exit 0
+
+        Test_Admin:
+        /* ----------------------------------------------- *
+         * Test_Admin                                      *
+         *                                                 *
+         * Verify that the requestor is authorized for the *
+         * administration function(s) of BUILD, COPY,      *
+         * ACCESS, and TEST.                               *
+         * ----------------------------------------------- */
+           if wordpos(this_user,admin_users) = 0 then do
+              smsg = null
+              lmsg = "Error:  Invalid option selected for this application",
+                     "causing a security violation."
+              Signal Exit_RISoft
+              end
+        return

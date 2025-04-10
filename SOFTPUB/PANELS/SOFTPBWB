@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ^ type(output) intens(high) caps(off) just(left ) color(white)
+   | type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(asis) color(white)
+)Body
++----------------% Softcopy Publications Softcopy Table Copy +------------------
+%
+%
+%                              Please be Patient
+%
+%
+%    Doing MVS/BDT Copy from: `build
+%                       to  : `prod
+%
+%    To Center:               `center
+%
+%
+%        The recently built Softcopy tables are now being MVS/BDT'd from the
+%        build library into the production library.
+%
+%
+)Init
+)Proc
+)End

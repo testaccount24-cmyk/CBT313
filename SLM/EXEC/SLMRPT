@@ -1,0 +1,166 @@
+        /* --------------------  rexx procedure  -------------------- *
+         * Name:      SLMRPT                                          *
+         *                                                            *
+         * Function:  Report the SLMCUST information to the user.     *
+         *                                                            *
+         * Syntax:    %slmrpt ver opt                                 *
+         *                                                            *
+         *           ver is the slm version passed by slm             *
+         *                                                            *
+         *           opt values:                                      *
+         *                                                            *
+         *               NOSYS = do not report JES2 Proc info         *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *            Kaiser Permanente                               *
+         *            Walnut Creek, CA 94598                          *
+         *            (925) 926-5332                                  *
+         *            Internet: lionel.b.dyck@kp.org                  *
+         *                                                            *
+         * History:                                                   *
+         *            12/12/02 - add saveloc option                   *
+         *            12/11/02 - creation                             *
+         * ---------------------------------------------------------- *
+         *  Copyright (C) 2002, Lionel B. Dyck                        *
+         *                                                            *
+         *  This program is free software; you can redistribute it    *
+         *  and/or modify it under the terms of the GNU General Public*
+         *  License as published by the Free Software Foundation;     *
+         *  either version 2 of the License, or (at your option) any  *
+         *  later version.                                            *
+         *                                                            *
+         *  This program is distributed in the hope that it will be   *
+         *  useful, but WITHOUT ANY WARRANTY; without even the implied*
+         *  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR   *
+         *  PURPOSE.  See the GNU General Public License for more     *
+         *  details.                                                  *
+         *                                                            *
+         *  You should have received a copy of the GNU General Public *
+         *  License along with this program; if not, write to the Free*
+         *  Software Foundation, Inc., 59 Temple Place - Suite 330,   *
+         *  Boston, MA  02111-1307,                                   *
+         *                                                            *
+         * ---------------------------------------------------------- */
+         arg version option
+
+        /* ----------------------- *
+         * Initialize our defaults *
+         * ----------------------- */
+         c     = 0
+         blank = " "
+
+        /* ---------------------------- *
+         * Access the SLMCUST variables *
+         * ---------------------------- */
+         x = slmcust()
+         parse value x with saveopt "/" savechar1 "/" savechar2 ,
+                stagesuf "/" stagedsn "/" permsto "/" ,
+                slmpds "/" j2proc "/" saveoptu "/" saveloc
+
+        /* --------------------------------- *
+         * Strip the leading/trailing blanks *
+         * --------------------------------- */
+          j2proc    = strip(j2proc)
+          permsto   = strip(permsto)
+          savechar1 = strip(savechar1)
+          savechar2 = strip(savechar2)
+          saveloc   = strip(saveloc)
+          saveopt   = strip(saveopt)
+          saveoptu  = strip(saveoptu)
+          slmpds    = strip(slmpds)
+          stagedsn  = strip(stagedsn)
+          stagesuf  = strip(stagesuf)
+
+          call add "System Library Manager Current Settings" ,
+                   "Version" version ,
+                   "Date" date('u')
+          call add blank
+          call add "Table Library in use :" slmpds
+          call add "Staging Suffix       :" stagesuf
+          call add "Save Character 1     :" savechar1
+          call add "Save Character 2     :" savechar2
+          if saveloc = 0 then
+             call add "Save Char Location   : replace last character"
+          else
+             call add "Save Char Location   : add if member < 8" ,
+                      "characters, change last if 8"
+          if option <> "NOSYS" then do
+             call add "Staging PARMLIB      :" stagedsn
+             call add "PARMLIB Save Library :" permsto
+             call add "JES2 PROC Name       :" j2proc
+             call testsopt saveopt
+             end
+          else call testsopt saveoptu
+
+          slm_dd = "C"random()
+          "allocate file("slm_dd") reuse space(1 1)" ,
+                   "tracks dsorg(ps) recfm(v b) lrecl(255)"
+          "execio * diskw" slm_dd "(stem out. finis)"
+          Address ISPExec
+          "LMInit Dataid(dataid) DDname("slm_dd")"
+          "Browse Dataid("dataid")"
+          "LMFree Dataid("dataid")"
+          Address TSO
+          "Free File("slm_dd")"
+
+          Exit 0
+
+        /* --------------------------------------- *
+         * Add the line of text to the output stem *
+         * --------------------------------------- */
+          Add:
+          parse arg line
+          c = c + 1
+          out.c = line
+          return
+
+        /* --------------------- *
+         * Define the saveoption *
+         * --------------------- */
+         TestSopt:
+         arg sopt
+         sodesc1 = ""
+         sodesc2 = ""
+         Select
+           When sopt = 1 then do
+                sodesc = "reversing the last two characters"
+                sodesc1 = "of the member name."
+                end
+           When sopt = 2 then do
+                sodesc = "changing the second to last character"
+                sodesc1 = "of the member name to" savechar1
+                end
+           When sopt = 3 then do
+                sodesc = "changing the last two characters to 99"
+                end
+           When sopt = 4 then do
+                sodesc = "saving two copies with the oldest changing"
+                sodesc1=  "the last character to" savechar2 "with the"
+                sodesc2 = "most recent changing the last" ,
+                          "character to" savechar1
+                end
+           When sopt = 5 then do
+                sodesc = "saving two copies with the oldest changing"
+                sodesc1 = "the NEXT to last character to" savechar2 ,
+                          "with the most"
+                sodesc2 = "recent changing the NEXT to",
+                          "last character to" savechar1
+                end
+           When sopt = 6 then do
+                sodesc = "by saving 4 iterations by changing the last",
+                         "character to"
+                sodesc1 = "1 to 2 to 3 to 4."
+                sodesc2 = "If member name",
+                          "less than 8 chars then add the iteration id."
+                end
+           Otherwise do
+                     sodesc = "changing last character" ,
+                              "to" savechar1
+                     end
+           end
+         call add "Save Option In Use   : Save backup" sodesc
+         if sodesc1 <> "" then
+         call add "                     :" sodesc1
+         if sodesc2 <> "" then
+         call add "                     :" sodesc2
+         return

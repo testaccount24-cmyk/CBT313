@@ -1,0 +1,4 @@
+MAIL000  '&MAILSMSG' .ALARM = YES
+'&MAILLMSG'
+MAIL001  'Error' .ALARM = YES
+'Sub Options allowed are 0 thru 8 only and only for Option S'

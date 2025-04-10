@@ -1,0 +1,36 @@
+)Attr Default(%+_)
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_') color(turq)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ~ type(text) intens(high) caps(off) just(asis ) color(turq)
+   % type(text) intens(high)
+   + type(text  ) intens(low )
+     skip(on)
+   # type(output) intens(high) caps(off) just(asis ) color(yellow)
+)Body
++-------------------% Softcopy Publications Selection Menu +--------------------
+%Command ===>_zcmd                                            %Scroll ===>_mamt+
+%
+`To select a category, type any non-blank character to left of the category
+`name and press ENTER, or move the cursor to that row and press ENTER.
++
+%Sel  Category
++
+)Model
+@z+  #z
+)Init
+  .Help  = SOFTPUBH
+  .ZVARS = '(ZSEL desc)'
+  &zsel = &z
+  &mamt = CSR
+)Proc
+ IF (&ZCMD = &Z)
+     if (&ztdsels = 0000)
+        &row = .csrrow
+        if (&row NE &z)
+            if (&zsel = &z)
+                &zsel = S
+     if (&ztdsels NE 0000)
+          &row = &z
+)End

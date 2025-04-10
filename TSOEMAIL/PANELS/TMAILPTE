@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ¦ type(output) intens(low ) caps(off) just(asis ) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+)Body
++----------------------% TSO/E-Mail File UnTerse Status +-----------------------
+%Command ===>_zcmd
+%
+%
+`      File UnTerse Processing was requested.
+%
+`!ptferr1
+`!ptferr2
+`!ptferr3
+`!ptferr4
+`!ptferr5
+`!ptferr6
+`!ptferr7
+`!ptferr8
+`!ptferr9
+`!ptferr10
+
+)Proc
+ &zcmd = &z
+)End

@@ -1,0 +1,74 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPES                                            *
+         *                                                               *
+         * Function:  Called by SOFTPUBA to Edit a Book Shelf and then   *
+         *            transmit the updated shelf to other centers        *
+         *                                                               *
+         * Syntax:    %SOFTPES                                           *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Rockwell International                             *
+         *            P.O. Box 2515                                      *
+         *            Seal Beach, California 90740                       *
+         *            (310) 797-1125                                     *
+         *            IBMMail:  USROKNTN                                 *
+         *            Internet: lbdyck@osreq48.rockwell.com              *
+         *            IBMLINK:  ROK2027                                  *
+         *                                                               *
+         * History:                                                      *
+         *            07/14/93 - update to update single upload shelf    *
+         *            02/23/93 - created.                                *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        Address ISPEXEC
+
+        Address TSO "%Softpdft"
+        "Vget (Centers Index)"
+
+        Do Forever
+
+        "Display Panel(Softpes)"
+          if rc > 0 then exit
+
+        if sysdsn(shelfdsn) <> "OK" then do
+           smsg = "Error"
+           lmsg = sysdsn(shelfdsn)
+           call do_msg
+           end
+        else do
+             if left(shelfdsn,13) = "'"index".UPLOAD" then do
+                Address TSO "%Softpbfx" shelfdsn
+                parse value shelfdsn with "'"index".UPLOAD." dsn_ok
+                shelfdsn = "'"index"."dsn_ok
+                new = 1
+                end
+             "Edit Dataset("shelfdsn")"
+             if rc = 0 then new = 1
+             if new = 1 then call do_bdt
+             end
+
+        end  /* end of do forever */
+
+        /* ------------------------------------------------------------- *
+         * Do_BDT routine is used to issue the MVS/BDT command....       *
+         * ------------------------------------------------------------- */
+        Do_BDT:
+        Address TSO
+        "Showtso Center"
+        do i = 1 to words(centers)
+           "BDT Q From Loc("center") DS("shelfdsn") Shr Dap(SEQ)",
+                 "To   Loc("word(centers,i)") DS("shelfdsn") Shr Dap(Seq)"
+           end
+        smsg = ""
+        lmsg = "Shelf updated and transmitted to:" centers
+        Address ISPEXEC
+        call do_msg
+        return
+
+        /* ------------------------------------------------------------- *
+         * Do_msg routine is used to issue the ISPF Message....          *
+         * ------------------------------------------------------------- */
+        Do_Msg:
+           "Setmsg Msg(SOFTP000)"
+        return

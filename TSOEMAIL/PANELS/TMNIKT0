@@ -1,0 +1,28 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+   ¦ type(text) intens(high) caps(off) just(asis ) color(turq)
+  @  TYPE(output) INTENS(high) color(yellow)
+)Body
++----------------------% TSO Mail Nick Name Management +------------------------
+%Selection ===>_zcmd
++
++
+        %1+- Process Primary Nick Name entries
+        %2+- Process Nick Name List entries
+        %3+- Process Control Information (ALTCTL, LOGNAME and LOGSEL)%*
+        %4+- Save the current file:@NICKDS
++
++
++    This dialog will supports the creation and maintenance of your
++    personal TSO/E Mail Nick Name entries, LIST entries and Control Information
++
++    * Not supported for alternate control data sets.
++
+!    Enter PF3 to terminate processing at this point.
+)Init
+)Proc
+ ver (&zcmd,range,1,4)
+)End

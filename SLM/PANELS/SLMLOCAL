@@ -1,0 +1,49 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ! type( input) intens(high) caps(on ) just(left )
+   } type(output) intens(high) caps(off) just(asis )
+   ¬ type( input) intens(high) caps(off) just(left ) pad('_')
+   # type(text) intens(high) caps(off) just(asis )
+     hilite(uscore)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+   ` type(text) intens(high) color(red)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+)Body  Expand(//)
+%-/-/- ~System Library Management Library List }ver   %-/-/-
+%Command ===>_zcmd                                 / /%Scroll ===>_amt +
+%
++ Commands:`Add+`Insert+`Cancel+`Report+
++ or       `S+Select`D+Delete`I+Insert`R+Repeat`or+overtype to change
++
+%Sel #Lib-Name +   #Description+
++
+)Model
+@z+  !z       +    ¬z                                                          +
+)Init
+  .ZVARS = '(zsel tblname tbldesc)'
+  &amt = csr
+)Proc
+ if (&zcmd EQ &z)
+     ver (&tblname,nb,dsname)
+)End
+/*  Copyright (C) 2002, Lionel B. Dyck
+/*
+/*  This program is free software; you can redistribute it
+/*  and/or modify it under the terms of the GNU General Public
+/*  License as published by the Free Software Foundation;
+/*  either version 2 of the License, or (at your option) any
+/*  later version.
+/*
+/*  This program is distributed in the hope that it will be
+/*  useful, but WITHOUT ANY WARRANTY; without even the implied
+/*  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+/*  PURPOSE.  See the GNU General Public License for more
+/*  details.
+/*
+/*  You should have received a copy of the GNU General Public
+/*  License along with this program; if not, write to the Free
+/*  Software Foundation, Inc., 59 Temple Place - Suite 330,
+/*  Boston, MA  02111-1307,

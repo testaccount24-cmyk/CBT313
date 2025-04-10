@@ -1,0 +1,21 @@
+TMAILQRY is a TSO command that will pass a return code indicating if the
+current TSO User or the specified Userid has any Mail files waiting to
+be RECEIVE'd.
+
+The syntax is:
+   TMAILQRY
+or TMAILQRY userid
+
+To install edit and run the ASMLINK member of this dataset. Then update
+SYS1.PARMLIB member IKJTSO00 to add TMAILQRY to the authorized TSO
+Command section of the member (AUTHCMD section).
+
+A sample rexx exec using this command is provided in member TMAILTST.
+
+TMAILQRY using the Process Sysout Interface (external writer) to see if
+there is any output with a dest of the specified userid.  If there is it
+sets a return code to indicate there is mail to receive.  If not then a
+return code indicates no mail.
+
+Return codes:   0        = mail to be received
+                non-zero = no mail to be received

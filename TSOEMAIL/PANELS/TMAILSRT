@@ -1,0 +1,43 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(text) intens(high) caps(off) just(asis ) color(turq)
+   ` type(text)   intens(low ) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) skip(on)    color(turq)
+   ! type(text) intens(high) caps(off) just(asis ) color(yellow)
+)BODY
++------------------------% SORT the TSO/E-Mail Table +--------------------------
+%Command ===>_zcmd
++
+`Select the sort fields by specifying the sort order (Ascending or Descending)
++
+~ ¬Sel     Sort Field
+~ @Z~     !From Node     ¬Site where message originated
+~ @Z~     !From Userid   ¬User who sent the message
+~ @Z~     !To Node       ¬Site where message was sent to
+~ @Z~     !To Userid     ¬User who message was sent to
+~ @Z~     !Date/Time     ¬Date and Time the message was received
+~ @Z~     !Last Action   ¬The last action performed on the message
++
++
+`Press ENTER to continue or PF3 (End) to cancel the sort request.
++
+)INIT
+  .ZVARS = '(FROMNODE FROMUSER TONODE TOUSER DATE ACTION)'
+  .CURSOR = FROMNODE
+  &fromnode = &z
+  &fromuser = &z
+  &tonode   = &z
+  &touser   = &z
+  &date     = &z
+  &action   = &z
+)PROC
+ ver (&fromnode,list,A,D)
+ ver (&fromuser,list,A,D)
+ ver (&tonode,list,A,D)
+ ver (&touser,list,A,D)
+ ver (&date,list,A,D)
+ ver (&action,list,A,D)
+)END

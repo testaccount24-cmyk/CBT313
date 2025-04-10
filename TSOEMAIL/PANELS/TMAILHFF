@@ -1,0 +1,35 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++------------------------% TSO/E-Mail Forward Message +-------------------------
+%Command ===>_zcmd
+%
+`    This dialog allows you to forward a message and/or file to other
+`    individual(s) via electronic mail.
+`
+%    Field       Description
+`
+¬    Userid     `The userid(s) or nickname(s) of the intended recipients
+`                an '*' may be used to forward the message to the original
+`                sender (a better technique for answering messages)
+`
+¬    Nodename   `The node name to be used if a userid is specified
+`                (this field may be blank if you are using a nickname)
+`
+¬    File       `This message has an associated file.  Specify 'Y' if you
+`                want to forward the file first.  Specify 'M' to send it
+`                the file as the message.
+`
+¬    Forwarded  `If this is 'yes' the forwarded text will be shifted right
+`                2 columns and the '>' symbol inserted in column 1.  A line
+`                of text will also be inserted before and after the text
+`                text to indicate the start and end of the forwarded text.
+)Init
+)Proc
+)End

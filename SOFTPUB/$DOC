@@ -1,0 +1,10 @@
+This dataset contains the elements of the Softcopy front-end
+application.  To use this issue a TSO RECEIVE for each member (except
+this one, member EXEC and PANELS) to create the necessary target
+datasets, including documentation.
+
+OR execute member $RECEIVE to create individual datasets.
+
+I now use the Softcopy Librarian to upload and manage the softcopy
+files.  The Collect step will compare what is in the softcopy table
+with the newly updated BKLSHELF from the softcopy librarian.

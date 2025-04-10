@@ -1,0 +1,36 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on ) just(left )
+   ¦ type( input) intens(high) caps(on ) just(left) pad('_') color(white)
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   # type(text) intens(low ) caps(off) just(asis ) color(white)
+)Body
++-------------------------% TSO/E-Mail Print Option +---------------------------
+%Command ===>_zcmd
+%
+%
+`      The message you have selected to print has both a message and a
+`      data set.
+
+`      To print the data set enter¬Y`otherwise enter the¬N`key to print the
+`      message associated with the data set.
+`
+`      Print the data set:===>_z+
+`
+`      From:    !mailfid
+`      At:      !mailfloc
+`      Subject: !mailsubj
+`      File:    !mailtds
+)Init
+ .zvars = 'printopt'
+ .cursor = printopt
+ &printopt = Y
+  &END = PFK(END)
+)Proc
+ &printopt = trunc(&printopt,1)
+ ver (&printopt,list,Y,N)
+ &zcmd = &z
+)End

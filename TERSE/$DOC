@@ -1,0 +1,21 @@
+This package includes 2 ISPF applications:
+
+PACKDS   - will terse a dataset
+UNPACKDS - will unterse a dataset
+
+Entry to each is via the exec.
+
+No warranty or guarantee is provided with this package.
+
+Original Author:
+         Lionel B. Dyck
+         Kaiser Permanente Information Technology
+         Walnut Creek, CA 94598
+         (925) 926-5332
+         Internet: lionel.b.dyck@kp.org
+
+Significantly rewritten by
+          Barry Gilder
+          ANZ Bank
+          Melbourne, Australia
+          Email: gilderb@anz.com

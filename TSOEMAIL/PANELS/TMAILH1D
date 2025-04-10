@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`      The¬SORT`command will sort the entries in the table using the specified
+`      field name as the sort key or display a selection panel to prompt for
+`      the field(s) to sort by.
+`
+`      Syntax: ¬SORT field-name direction
+`
+`      Note:  - field-name must be specified and must be one of the supported
+`               names documented below¬or`if blank will cause a selection
+`               panel to be displayed.
+`             - direction is¬A`for ascending or¬D`for descending (default=A).
+`
+`      Supported field-names:
+`
+¬      FROMNODE  `Sending Node Name       ¬DATE      `Date the message received
+¬      FROMUSER  `Sending User ID         ¬TIME      `Time the message received
+¬      TONODE    `Receiving Node Name     ¬ACTION    `Last action performed
+¬      TOUSER    `Receiving User ID
+)End

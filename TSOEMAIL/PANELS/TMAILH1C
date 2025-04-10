@@ -1,0 +1,24 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬SENDMAIL`command allows you to send a message to another user
+`      anywhere in the network.
+`
+`      Syntax: ¬SENDMAIL recipient
+`
+`      Note:    recipient is optional and if not specified a prompting panel
+`               will be displayed.
+`              ¬SENDMAIL`can be abbreviated to¬SEND.
+`
+`      SENDMAIL uses the ISPF Editor for the entry of your message text.
+)End

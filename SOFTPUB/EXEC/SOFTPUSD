@@ -1,0 +1,399 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPUSD                                           *
+         *                                                               *
+         * Function:  Create Several Reports of Softcopy Files:          *
+         *                                                               *
+         *            1.  Report 1 - all books                           *
+         *                Contents.......                                *
+         *                Book DSName                                    *
+         *                Book order number                              *
+         *                Date/time stamp (if any)                       *
+         *                Title                                          *
+         *                Shelf                                          *
+         *                                                               *
+         *            2.  Report 2 - all used books                      *
+         *                Contents.......                                *
+         *                Book DSName                                    *
+         *                Book order number                              *
+         *                Date/time stamp (if any)                       *
+         *                Title                                          *
+         *                Shelf                                          *
+         *                                                               *
+         *            2a. Report 2a- all used books with DCF Tags        *
+         *                Contents.......                                *
+         *                Book DSName                                    *
+         *                Book order number                              *
+         *                Date/time stamp (if any)                       *
+         *                Title                                          *
+         *                Shelf                                          *
+         *                                                               *
+         *            3.  Report 3 - all not reference books/shelves     *
+         *                Contents.......                                *
+         *                Book DSName                                    *
+         *                Book order number                              *
+         *                Date/time stamp (if any)                       *
+         *                Title                                          *
+         *                Shelf                                          *
+         *                                                               *
+         *            4.  Report 4 - all not reference books/shelves     *
+         *                Contents.......                                *
+         *                                                               *
+         *            The report is created in a temporary               *
+         *            data set and includes Script tags and the          *
+         *            user is prompted for a target location for         *
+         *            the file after browsing it.                        *
+         *                                                               *
+         *            These files are also placed into flat files        *
+         *            without tags thus:                                 *
+         *                                                               *
+         *                Book DSName  (44)                              *
+         *                Book order number (8)                          *
+         *                Date/time stamp (17)                           *
+         *                Shelf (8)                                      *
+         *                Title (variable)                               *
+         *                                                               *
+         * Syntax:    %softpusd                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Rockwell International                             *
+         *            P.O. Box 2515                                      *
+         *            Seal Beach, California 90740                       *
+         *            (310) 797-1125                                     *
+         *            IBMMail:  USROKNTN                                 *
+         *            Internet: lbdyck@osreq48.rockwell.com              *
+         *            IBMLINK:  ROK2027                                  *
+         *                                                               *
+         * History:                                                      *
+         *            06/13/95 - add quotes to delete                    *
+         *            07/02/93 - rewrite for multiple reports            *
+         *            04/26/93 - created                                 *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        "%SOFTPDFT"
+        Address ISPEXEC "VGET (INDEX build)"
+
+        d    = date(u)
+        date = substr(d,7,2)substr(d,1,2)substr(d,4,2)
+        adsn = "Softcopy.ALL.D"date
+        udsn = "Softcopy.USED.D"date
+        kdsn = "Softcopy.KILL.D"date
+
+        parse value "" with null script. report. bookidx. bookname.,
+                       info. kill. used. flag notep. kille. shelf. shelves
+        parse value "0 0 0 0 0 0 0" with script.0 report.0 bookidx.0,
+                       kill.0 notep.0 kille.0 shelf.0
+
+        ddn        = "BK"random()
+
+        x = outtrap("listc.","*")
+        "LISTC LEVEL('"index".*.BKSHELF')"
+        "LISTC LEVEL('"index".*.BOOK')"
+        "LISTC LEVEL('"index".*.NOTEP')"
+        x = outtrap("OFF")
+
+        report.0 = 2
+        report.1 = "List of All Softcopy Publications"
+        report.2 = " "
+
+        say "Processing result of LISTC"
+
+        listc_phase = 0
+
+        do i = 1 to listc.0
+           if substr(listc.i,2,1) = " " then iterate
+           parse value listc.i with "NONVSAM -------" dsname .
+             if right(dsname,8) = ".BKSHELF" then call do_bkshelf
+             if right(dsname,5) = ".BOOK" then do
+                bookname.dsname = "*here*" bookname.dsname
+                end
+             if right(dsname,6) = ".NOTEP" then call do_notep
+           end
+
+        say "Processing complete for LISTC"
+
+        listc_phase = 1
+
+         x = msg("off")
+        "Delete "adsn".report"
+        "Delete "udsn".script"
+        "Delete "udsn".report"
+        "Delete "kdsn".report"
+        "Delete "kdsn".exec"
+         x = msg("on")
+
+        "Alloc f("ddn") New Reuse ds("adsn".report)",
+           "Recfm(V B) Lrecl(255) Blksize(0)",
+           "tracks Space(30,30) release"
+        "Execio * diskw" ddn "(Finis Stem report."
+
+        call Do_Build
+
+        used.0 = 3
+        used.1 = "List of All Referenced Softcopy Publications"
+        used.3 = " "
+
+        kill.0 = 2
+        kill.1 = "List of Unreferenced Softcopy Publications"
+        kill.2 = " "
+
+        kille.0 = 2
+        kille.1 = "/* rexx procedure to delete Softcopy Publications */"
+        kille.2 = " "
+
+        say "Calling Find_Used"
+        call Find_Used
+
+        used.2 = "used files:" used.0-3  "out of a total file count of:",
+                 total_files "with" kill.0-2 "unreferenced files.",
+                 "Cross check is:" used.0 + kill.0 - 5 "vs" total_files
+
+        "Alloc f("ddn") New Reuse ds("udsn".script)",
+           "Recfm(V B) Lrecl(255) Blksize(0)",
+           "tracks Space(30,30) release"
+        "Execio * diskw" ddn "(Finis Stem script."
+
+        "Alloc f("ddn") New Reuse ds("udsn".report)",
+           "Recfm(V B) Lrecl(255) Blksize(0)",
+           "tracks Space(30,30) release"
+        "Execio * diskw" ddn "(Finis Stem used."
+
+        "Alloc f("ddn") New Reuse ds("kdsn".report)",
+           "Recfm(V B) Lrecl(255) Blksize(0)",
+           "tracks Space(30,30) release"
+        "Execio * diskw" ddn "(Finis Stem kill."
+
+        Call Create_Kill_Exec
+        "Alloc f("ddn") New Reuse ds("kdsn".exec)",
+           "Recfm(V B) Lrecl(255) Blksize(0)",
+           "tracks Space(30,30) release"
+        "Execio * diskw" ddn "(Finis Stem kille."
+
+        "Free f("ddn")"
+
+        if sysvar(sysenv) <> "FORE" then exit 0
+        Address ISPEXEC "Browse Dataset("adsn".report)"
+        Address ISPEXEC "Browse Dataset("udsn".script)"
+        Address ISPEXEC "Browse Dataset("udsn".report)"
+        Address ISPEXEC "Browse Dataset("kdsn".report)"
+        Address ISPEXEC "Browse Dataset("kdsn".exec)"
+
+        Exit 0
+
+        do_bkshelf:
+        dsname = strip(dsname)
+        if listc_phase = 0 then do
+           book_dsn = dsname
+           bookname.dsname = "*here* SHELF"
+           call set_book
+           end
+        if listc_phase = 1 then do
+           bookname.dsname = bookname.dsname "Build"
+           end
+        "Alloc f("ddn") Shr Reuse Ds('"dsname"')"
+        "Execio * Diskr" ddn "(Finis Stem Book."
+        "Free  f("ddn")"
+        parse value dsname with front ".BKSHELF"
+        front = translate(front," ",".")
+        shelf = translate(word(front,2))
+        call Get_Info
+        return
+
+        Get_Info:
+        do j = 1 to book.0
+          select
+          when left(book.j,2) = "SH" then do
+               if book_num <> "" then call save_it
+               parse value "" with book_num Book_title book_dsn,
+                                   book_name book_datetime
+               book_num = substr(book.j,3)
+               end
+          when left(book.j,2) = "ST" then do
+               book_title     = strip(substr(book.j,3))
+               end
+          when left(book.j,7) = "BKNAME=" then do
+               parse value book.j with "BKNAME=" book_name
+               end
+          when left(book.j,7) = "BKMDSN=" then do
+               parse value book.j with "BKMDSN=" book_dsn
+               book_dsn = strip(translate(book_dsn))
+               end
+          when left(book.j,11) = "BKDATETIME=" then do
+               parse value book.j with "BKDATETIME=" book_datetime
+               end
+          when left(book.j,9) = "BKSTITLE=" then do
+               parse value book.j with "BKSTITLE=" book_title
+               book_dsn      = dsname
+               book_dsn      = strip(translate(book_dsn))
+               book_num      = "*shelf*"
+               book_name     = "Shelf"
+               book_datetime = "Shelf"
+               call save_it
+                    parse value "" with book_num Book_title book_dsn,
+                                   book_name book_datetime
+               end
+          when left(book.j,9) = "BKSIMDSN=" then do
+               parse value book.j with "BKSIMDSN=" book_dsn
+               book_dsn = strip(translate(book_dsn))
+               book_num = "*index*"
+               book_title = "Index"
+               book_name  = "Index"
+               if listc_phase = 1 then do
+                  book_datetime = "used"
+                  bookname.book_dsn = bookname.book_dsn "Build"
+                  end
+               else do
+                  bookname.book_dsn = "*here* Index"
+                  book_datetime = "index"
+                  call set_book
+                  end
+               if length(book_dsn) > 0 then
+               call save_it
+                    parse value "" with book_num Book_title book_dsn ,
+                                   book_name book_datetime
+               end
+          otherwise nop;
+        end
+        end
+        return
+
+        Do_Notep:
+           n = notep.0 + 1
+           notep.0 = n
+           notep.n = dsname
+        return
+
+        Save_It:
+        if flag <> 1 then call set_book
+        if flag <> 1 then call set_info
+        call set_bookname
+        data = left(book_dsn,44) left(book_num,9) left(book_datetime,17),
+               left(shelf,8) book_title
+        c = report.0 + 1
+        report.c = data
+        report.0 = c
+        return
+
+        Set_Book:
+        bc         = bookidx.0 + 1
+        bookidx.bc = book_dsn
+        bookidx.0 = bc
+        return
+
+        Set_Bookname:
+        if flag = 1 then shelf = "Build"
+        bookname.book_dsn = bookname.book_dsn shelf
+        return
+
+        Set_Info:
+        Info.book_dsn = book_num "%" book_datetime "%" book_title
+        return
+
+        Do_Build:
+        flag = 1
+        parse value build with "'" build "'"
+        "Alloc f("ddn") Shr Reuse Ds('"build"(BUILD)')"
+        "Execio * Diskr" ddn "(Finis Stem build."
+        "Free f("ddn")"
+
+        do b = 1 to build.0
+           parse value "" with book_num Book_title book_dsn,
+                               book_name book_datetime
+           type = translate(left(build.b,1))
+           Select
+           When type = "B" then do
+                parse value build.b with "B" book_dsn book_title
+                book_dsn = strip(translate(book_dsn))
+                call set_info
+                call set_book
+                call set_bookname
+                end
+           When type = "S" then do
+                Parse value build.b with t dsname .
+                call do_bkshelf
+                end
+           otherwise nop
+           end
+        end
+        Return
+
+        Find_Used:
+        total_files = 0
+        do i = 1 to bookidx.0
+           book_dsn = bookidx.i
+           if bookname.book_dsn = "gone" then iterate
+           shelf = bookname.book_dsn
+           bookname.book_dsn = "gone" /* remove after 1st use */
+           parse value info.book_dsn with book_num "%" book_datetime "%",
+                        book_title
+           hpos = wordpos("*here*",shelf)
+           if hpos = 0 then iterate
+           total_files = total_files + 1
+           c_shelf = delword(shelf,hpos,1)
+           bpos = wordpos("Build",c_shelf)
+           if bpos > 0 then
+              c_chelf = delword(c_shelf,bpos,1)
+              else c_cshelf = c_shelf
+           data = left(book_dsn,44) left(book_num,9) left(book_datetime,17),
+                  "("c_shelf")" book_title
+           if hpos = 0 then iterate
+           if bpos = 0 then do
+              c = kill.0 + 1
+              kill.c = data
+              kill.0 = c
+              end
+              else do
+                   c = used.0 + 1
+                   used.c = data
+                   used.0 = c
+                   call set_script
+                   end
+        end
+
+        do i = 1 to notep.0
+           notedsn = notep.i
+           parse value notedsn with prefix ".NOTEP"
+           testdsn = prefix".BOOK"
+           data = left(testdsn,44) left("*Notep*",9) left("Notep",17),
+                  left("Notep",8) "Public Note"
+           if wordpos("Build",bookname.testdsn) = 0 then do
+              c = kill.0 + 1
+              kill.c = data
+              kill.0 = c
+              end
+              else do
+                   c = used.0 + 1
+                   used.c = data
+                   used.0 = c
+                   end
+        end
+        return
+
+        Set_Script:
+        count        = script.0 + 1
+        script.count = ":row."
+        count = count + 1
+        script.count = ":c."book_num
+        count = count + 1
+        script.count = ":c."book_name
+        count = count + 1
+        script.count = ":c."book_dsn
+        count = count + 1
+        script.count = ":c."book_title
+        count = count + 1
+        script.count = ":c."book_datetime
+        count = count + 1
+        script.count = ":c."shelf
+        script.0     = count
+        return
+
+        Create_Kill_Exec:
+        do i = 3 to kill.0
+           parse value kill.i with dsname .
+           parse value Info.dsname with ig1 "%" ig2 "%" title
+           c = kille.0 + 1
+           kille.0  = c
+           killdata = '"Delete"' '"'"'"dsname"'"'"'
+           kille.c  = left(killdata,40) "/*" title "*/"
+           end
+        return

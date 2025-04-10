@@ -1,0 +1,347 @@
+        /* --------------------  rexx procedure  --------------------  *
+         * Name:       TMAILSAF                                        *
+         *                                                             *
+         * Function:   This is the driver exec for processing the      *
+         *             SAFE Mail functions:                            *
+         *                                                             *
+         *             - If the READ option is specified then TSO      *
+         *               RECEIVE command will be processed to          *
+         *               receive any mail sent to this userid and      *
+         *               "SAFEMAIL ADD/DELETE" messages will be        *
+         *               scanned for and processed.  No files are      *
+         *               allowed to be sent to this userid.            *
+         *                                                             *
+         *               This option will also perform the SAFE        *
+         *               function.                                     *
+         *                                                             *
+         *             - If the SAFE option is specified then TSO      *
+         *               Mail Safe Mail Userid data set is read and    *
+         *               the TSOMAIL exec is processed using the       *
+         *               SAFE option for every userid specified.       *
+         *                                                             *
+         *               During this process the user's mail will      *
+         *               be received and recorded in the user's        *
+         *               TSO Mail log (userid.TSOMAIL.LOG) and         *
+         *               files are received into unique data sets      *
+         *               with date and time stamps.  The TSO Mail      *
+         *               Table data set will not be updated at this    *
+         *               time.                                         *
+         *                                                             *
+         * Process Notes:                                              *
+         *                                                             *
+         *             1.  Messages may be sent to the SAFEMAIL userid *
+         *                 by the user to have their userid added      *
+         *                 and/or removed from SAFEMAIL processing.    *
+         *                 The messages are of the format within the   *
+         *                 TSO Transmit message and may be in any      *
+         *                 column.                                     *
+         *                                                             *
+         *                 SAFEMAIL: ADD userid                        *
+         *                 SAFEMAIL: DELETE userid                     *
+         *                                                             *
+         *             2.  It is assumed that the normal process will  *
+         *                 be to run the SAFEMAIL started task at      *
+         *                 least once per day with the following       *
+         *                 commands:                                   *
+         *                                                             *
+         *                 TMAILSAF READ                               *
+         *                 TMAILSAF SAFE                               *
+         *                                                             *
+         *             3.  The SAFEMAIL userid data set is of the      *
+         *                 format:                                     *
+         *                                                             *
+         *                 column  contents                            *
+         *                 1-8     Userid                              *
+         *                                                             *
+         *                 RECFM=FB,LRECL=80,BLKSIZE=80*n              *
+         *                                                             *
+         *                 Comments have an * is column 1.             *
+         *                                                             *
+         * Syntax:     TMAILSAF Option (userids)                       *
+         *                                                             *
+         *             Valid Options:                                  *
+         *                                                             *
+         *                   READ                                      *
+         *                   SAFE                                      *
+         *                                                             *
+         * Diagnostic Note:  DEBUG can be specified as a parameter     *
+         *             with any option and it will enable REXX         *
+         *             tracing to help identify problems with this     *
+         *             exec.                                           *
+         *                                                             *
+         * Additional Notes:                                           *
+         *                                                             *
+         *        This REXX procedure should be processed at least     *
+         *        once per day by a started task with the name of      *
+         *        SAFEMAIL and thus a userid of SAFEMAIL.  It should   *
+         *        be non-cancellable so that it can update data sets   *
+         *        owned by other users.  The data set that it will     *
+         *        be updating is the user's userid.TSOMAIL.LOG.        *
+         *        This exec must also be able to read the user's       *
+         *        userid.NAMES.TEXT if one exists.                     *
+         *                                                             *
+         *        The READ process WILL use a userid of SAFEMAIL       *
+         *        on the RECEIVE command.                              *
+         *                                                             *
+         *        During the processing of this REXX procedure it      *
+         *        will issue status messages indicating where it is    *
+         *        in it's process.  These messages are written to      *
+         *        the SYSTSPRT output data set which is normally       *
+         *        defined as SYSOUT.  I suggest that this SYSOUT       *
+         *        data be written to a SYSOUT class defined as hold    *
+         *        for TSO to allow someone (probably the TSO           *
+         *        administrator) to view it using a spool viewing      *
+         *        utility.                                             *
+         *                                                             *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                             *
+         * History:                                                    *
+         *             07/02/99 - Lionel Dyck                          *
+         *                      - change date to y2k                   *
+         *             08/04/93 - Lionel Dyck                          *
+         *                      - add use of TMAILQRY                  *
+         *             09/25/91 - Lionel Dyck                          *
+         *                      - remove SHOWTSO and index for cds     *
+         *             05/01/90 - Lionel Dyck                          *
+         *                      - Creation of this exec                *
+         *             05/02/90 - Lionel Dyck                          *
+         *                      - cleanup and improve doc              *
+         *             06/11/90 - Lionel Dyck                          *
+         *                      - Fix receive for userid of SAFEMAIL   *
+         *                        for logdsn                           *
+         *             06/20/90 - Lionel Dyck                          *
+         *                      - change initialization of ?.0 = 0     *
+         *                        to ?. = 0 for speed                  *
+         *                                                             *
+         * ----------------------------------------------------------  */
+
+        arg option parms
+
+        if wordpos("DEBUG",parms,1) > 0 then do
+           trace i
+          n = wordpos("DEBUG",parms,1)
+           y = delword(parms,n,5)  /* remove the word debug */
+           parms = y /* reset parms without the word debug in it */
+           end
+
+        /* ----------------------------------------------------------  *
+         * This is the control data set name to be used ************** *
+         * ----------------------------------------------------------  */
+
+        safedsn = "'AISC.SAFEMAIL.CDS'"
+
+        x = msg("OFF")
+
+        if sysdsn(safedsn) <> "OK" then do
+           say date() time(),
+               "Error encountered in locating the SAFE Mail Control Data Set"
+           say date() time(),
+               "SAFE Mail procedure terminating - contact your TSO Coordinator"
+           exit  8
+           end
+           else "ALLOC F(SAFEMAIL) SHR REUSE DS("safedsn")"
+        if rc > 0 then do
+           say date() time(),
+               "SAFEMAIL Processing is terminating because of an allocation",
+               "failure for the"
+           say date() time(),
+               "SAFE Mail Control Data Set:" safedsn
+           exit 12
+           end
+
+        x = msg("ON")
+
+        /* -------------------------------------------------------- *
+         *                                                          *
+         * Option: READ                                             *
+         *                                                          *
+         * Logic:                                                   *
+         *                                                          *
+         * 1.  Issue the TSO RECEIVE Command.                       *
+         *                                                          *
+         * 2.  Loop thru the captured output looking for SAFEMAIL:  *
+         *     which will indicate that we have a userid to add or  *
+         *     to DELETE from the Safe Mail Control Data Set.       *
+         *                                                          *
+         * 3.  If found then update appropriate variables.          *
+         *                                                          *
+         * 4.  Invoke the CDS Update routine if any updates are     *
+         *     to occur.                                            *
+         *                                                          *
+         * 5.  Set the option to SAFE and perform SAFE Mail         *
+         *     processing now.                                      *
+         *                                                          *
+         * -------------------------------------------------------- */
+
+        if option = "READ" then do
+
+        say date() time() "Starting the SAFEMAIL READ Processing"
+
+        option = "SAFE"
+        index  = "AISC"
+
+        x = OUTTRAP("output.",'*',"CONCAT")
+
+        "RECEIVE USERID(SAFEMAIL) LOGDSNAME('"index".LOG.DATA')"
+
+        /* delete the log data set as it is not required or wanted */
+        "DELETE '"index".LOG.DATA'"
+
+        x = OUTTRAP('OFF')
+
+        add.     =
+        add.0    = 0
+        delete.  =
+        delete.0 = 0
+
+        do i = 1 to output.0
+           upper output.i
+           if word(output.i,1) = "SAFEMAIL:" then do
+               opt = word(output.i,2)
+               uid = word(output.i,3)
+               if opt = "ADD" then do
+                         add.0 = add.0 + 1
+                         x = add.0
+                         add.x = uid
+                         update = "yes"
+                         end
+               if opt = "DELETE" then do
+                         delete.0 = delete.0 + 1
+                         x = delete.0
+                         delete.x = uid
+                         update = "yes"
+                         end
+               end
+           end
+
+        say date() time() "Beginning update of the SAFEMAIL CDS" safedsn
+
+        if update = "yes" then do
+           nsafe.   =
+           nsafe.0  = 0
+              "EXECIO * DISKR SAFEMAIL (FINIS STEM safe."
+
+              do i = 1 to safe.0
+
+                      do d = 1 to delete.0
+                           if substr(safe.i,1,8) = delete.d then do
+                              safe.i = ""
+                              say date() time(),
+                                  "Userid" delete.d "deleted from SAFEMAIL"
+                              end    /* end of compare */
+                           end       /* end of delete scan */
+
+                           if safe.i <> "" then do
+                               nsafe.0 = nsafe.0 + 1
+                               idc = nsafe.0
+                               nsafe.idc = safe.i
+                               end
+
+               end   /* end of safe.0 loop */
+
+                      do a = 1 to add.0
+                           nsafe.0 = nsafe.0 + 1
+                           idc = nsafe.0
+                           nsafe.idc = add.a
+                           say date() time(),
+                               "Userid" add.a "added to SAFEMAIL"
+                         end
+
+             "EXECIO * DISKW SAFEMAIL (FINIS STEM nsafe."
+
+        say date() time() "Completed update of the SAFEMAIL CDS:" safedsn
+        end
+
+        /* -------------------------------------------------------- *
+         *                                                          *
+         * Option:  SAFE                                            *
+         *                                                          *
+         * Logic:                                                   *
+         *                                                          *
+         * 1.  Read the SAFE Mail control data set.                 *
+         * 2.  Determine if the user is currently logged on         *
+         *     and skip SAFE processing if they are.                *
+         *     otherwise;                                           *
+         * 3.  For every userid invoke the TMAILQRY and if there    *
+         *     is mail then                                         *
+         * 4.  For every userid invoke the TSOMAIL exec with        *
+         *     the SAFE option.                                     *
+         *                                                          *
+         * -------------------------------------------------------- */
+
+        if option = "SAFE" then do
+        pid = 0  /* initialize our counter */
+        say date() time() "Beginning SAFEMAIL SAFE Processing"
+           "EXECIO * DISKR SAFEMAIL (FINIS STEM safe."
+           do idc = 1 to safe.0
+              if substr(safe.idc,1,1) <> "*" then do
+                 uid = strip(substr(safe.idc,1,8),)
+                 call testid
+                 if exec <> "on" then do
+                    say date() time() "Invoking TSOMAIL for user:" uid
+                    "%TSOMAIL SAFE USERID("uid")"
+                    say date() time() "Completed TSOMAIL for user:" uid
+                    pid = pid + 1
+                                      end
+                 else if tmq = 0 then do
+                    say date() time(),
+                        "TSOMAIL Processing bypassed for user:",
+                         uid "because the user is currently logged on"
+                      end
+                 end
+              end
+        say date() time() "SAFEMAIL SAFE Processing Completed for",
+            pid "users"
+        end
+
+        Exitsafe:
+           x = msg("OFF")
+           "FREE F(SAFEMAIL)"
+           exit 0
+
+        /* -------------------------------------------------------- *
+         *                                                          *
+         * TESTID subroutine                                        *
+         *                                                          *
+         * Purpose:  The purpose of this routine is to test the     *
+         *           status of the userid passed in variable uid    *
+         *           and return the status in variable exec.        *
+         *                                                          *
+         * -------------------------------------------------------- */
+        Testid:
+
+        tmq = 0
+        "TMAILQRY" uid
+        if rc = 4 then do
+           say date() time() "Userid" uid ,
+               "has no mail to be received at this time"
+           exec = "on"
+           tmq  = 1
+           return
+           end
+
+        x = OUTTRAP("output.",'*',"CONCAT")
+
+        "ST" uid
+
+        x = OUTTRAP('OFF')
+
+        opt = "JOB" uid
+
+        exec = "off"
+
+        do i = 1 to output.0
+           if  pos(opt,output.i,1) > 0 then do
+              x = pos("EXECUTING+",output.i,1)
+              if x = 0 then iterate
+              exec = "on"
+              leave
+           end
+        end
+
+        return exec

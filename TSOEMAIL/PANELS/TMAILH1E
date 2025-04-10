@@ -1,0 +1,25 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬SAFEMAIL`command will invoke the registration dialog for
+`      Safe Mail procesing.
+`
+`      Syntax: ¬SAFEMAIL
+`
+`      SAFE Mail is a process that runs daily to receive mail messages
+`      and mail files that have been sent to you from another user for
+`      you while you are out of the office for more than a few days.
+`      This is to prevent these mail messages and mail files from
+`      being deleted from the system because of age.
+`
+)End

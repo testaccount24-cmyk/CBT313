@@ -1,0 +1,30 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+`
+`
+`      The¬S.0`or¬Read`option will display the transmit message that was sent
+`      along with the data set using ISPF Browse.
+`
+`      The¬S.1`or¬Browse`option will display the data set using ISPF Browse.
+`      All of the standard ISPF Browse capabilities are available while
+`      browsing the selected data set.
+`
+`      The¬S.2`or¬Edit`option will invoke ISPF Edit on the selected data set.
+`      ALL of the standard ISPF Edit capabilities are available while editing
+`      the selected data set.
+`
+%      Notes:
+`     ¬S.0`may also be specified as:¬READ
+`     ¬S.1`may also be specified as:¬BR`or¬BROW
+`     ¬S.2`may also be specified as:¬ED`or¬EDIT
+`
+)End

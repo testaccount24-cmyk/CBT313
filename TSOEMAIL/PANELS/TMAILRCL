@@ -1,0 +1,24 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¦ type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(right) color(white)
+      hilite(reverse)
+   ~ type(text) intens(high) caps(off) just(asis ) color(white)
+      hilite(reverse)
+)Body
++----------------------% TSO/E-Mail RECEIVE Processing +------------------------
+%
+%
+%
+%           Your TSO Mail ISPF Table Data Set is currently migrated.
+%
+%
+%   Press~ENTER%to recall the data set now and continue processing your mail
+%             or press`KEND%to terminate mail processing for now.
+)Init
+  &KEND = PFK(END)
+)Proc
+)End

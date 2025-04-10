@@ -1,0 +1,50 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TMFIXSUB                                           *
+         *                                                               *
+         * Function:  Fixup the subject line for the TSO/E Mail Send     *
+         *            by finding the subject within the text being sent. *
+         *                                                               *
+         * Syntax:    FIXSUB option                                      *
+         *                                                               *
+         *            Where option is the word to look for that defines  *
+         *            the subject to be used.  For example:              *
+         *                                                               *
+         *            FIXSUB subject                                     *
+         *            FIXSUB title                                       *
+         *                                                               *
+         *            if option is null then 'subject' is used           *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Rockwell International                             *
+         *            P.O. Box 2515                                      *
+         *            Seal Beach, California 90740                       *
+         *            (310) 797-1125                                     *
+         *            IBMMail:  USROKNTN                                 *
+         *            Internet: lbd@osreq48.rockwell.com                 *
+         *            IBMLINK:  ROK2027                                  *
+         *                                                               *
+         * History:                                                      *
+         *            09/26/94 - created macro                           *
+         *                       but still doesn't work                  *
+         * ------------------------------------------------------------- */
+        Address ISREDIT
+
+        "Macro (opt)"
+
+        if length(opt) = 0 then opt = 'subject'
+
+        "Find" opt "first"
+        if rc = 0 then do
+              "(LINE) = CURSOR"
+              "(DATA) = LINE" line
+              end
+              else exit 0
+        hdata = translate(data)
+        opt = translate(opt)
+        swo = pos(opt,hdata)
+        swl = length(opt)+1
+        subj = substr(data,swo+swl)
+        newsubj  = strip(subj)
+        Address ISPEXEC,
+           "vput (newsubj) shared"
+        "end"

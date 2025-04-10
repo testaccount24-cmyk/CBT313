@@ -1,0 +1,71 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(turq)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ~ TYPE(INPUT) CAPS(OFF) INTENS(HIGH) COLOR(yellow) hilite(uscore)
+   ` TYPE(INPUT) CAPS(ON)  INTENS(HIGH) COLOR(yellow) hilite(uscore)
+)Body
++---------------------------% TSO/E-Mail Defaults +-----------------------------
+%Command ===>_zcmd
+%
+¬     Verify your TSO Mail Processing Defaults:
++
+¬     Your Name:          ~SENDFRM1                         +
+¬     Mailing Address:    ~SENDFRM2                               +
+¬     Other Info:         ~SENDFRM3                               +
++
+¬     Current Node:       `SENDCTR +
++
+¬     Should the Message be logged:          `Z  + (Yes or No)
+¬     Do you want your message acknowledged: `Z  + (Yes or No)
++
+¬     Retain 3 Mail Logs for Debugging:      `Z  + (Yes or No)
++
+¬     Printing Information for Messages:
+      (if blank you will be prompted each time):
+¬     Printer Name:     `TSOMPRT +
+¬     Optional:  Chars: `Z    ¬   FCB:   `Z   ¬  Form: `Z   +
+¬                Class: `Z¬       Title: `Z  +   (Yes or No)
++
+)Init
+  .ZVARS = 'TMAILLOG TMAILACK TMDEL PRTCHAR PRTFCB PRTFORM PRTCLASS PRTHEAD'
+  &TMAILLOG = TRANS(TRUNC(&TMAILLOG,1) Y,Yes N,No &Z,Yes *,*)
+  &TMAILACK = TRANS(TRUNC(&TMAILACK,1) Y,Yes N,No &Z,Yes *,*)
+  &TMDEL    = TRANS(TRUNC(&TMDEL,1) Y,Yes N,No &Z,No *,*)
+  &PRTHEAD  = TRANS(TRUNC(&PRTHEAD,1) Y,Yes N,No &Z,Yes *,*)
+  &PRTCLASS = TRANS(&PRTCLASS &Z,A *,*)
+  .HELP = TMAILHD1
+)Proc
+    VER (&SENDFRM1,NB)
+    VER (&SENDFRM2,NB)
+    VER (&SENDFRM3,NB)
+    VER (&SENDCTR,NB,NAME)
+    &TMAILLOG = TRANS(TRUNC(&TMAILLOG,1) Y,Y y,Y n,N N,N &Z,Y *,*)
+    &TMAILACK = TRANS(TRUNC(&TMAILACK,1) Y,Y y,Y n,N N,N &Z,Y *,*)
+    &TMDEL    = TRANS(TRUNC(&TMDEL,1) Y,Y N,N &Z,N *,*)
+    &PRTHEAD  = TRANS(TRUNC(&PRTHEAD,1) Y,Y N,N &Z,Y *,*)
+    VER (&TMAILLOG,NB,LIST,Y,N,y,n)
+    VER (&TMAILACK,NB,LIST,Y,N,y,n)
+    VER (&TMDEL,NB,LIST,Y,N)
+    VER (&TSOMPRT,NAME)
+    IF (&TSOMPRT NE &Z)
+       VER (&PRTHEAD,LIST,Y,N)
+       &TSOMPRTO = &Z
+       IF (&PRTFORM NE &Z)
+         &TSOMPRTO = ' FORM(&PRTFORM)'
+       IF (&PRTFCB NE &Z)
+         &TSOMPRTO = '&TSOMPRTO FCB(&PRTFCB)'
+       IF (&PRTCHAR NE &Z)
+         &TSOMPRTO = '&TSOMPRTO CHAR(&PRTCHAR)'
+       IF (&PRTCLASS NE &Z)
+         &TSOMPRTO = '&TSOMPRTO CLASS(&PRTCLASS)'
+       IF (&PRTHEAD = N)
+         &TSOMPRTO = '&TSOMPRTO NOTITLE'
+    VPUT (SENDFRM1 SENDFRM2 SENDFRM3 TMAILLOG TMAILACK) PROFILE
+    VPUT (TSOMPRT PRTFORM PRTFCB PRTCHAR TSOMPRTO TMDEL) PROFILE
+    VPUT (SENDCTR PRTCLASS PRTHEAD) PROFILE
+    VPUT (SENDCTR) SHARED
+)End

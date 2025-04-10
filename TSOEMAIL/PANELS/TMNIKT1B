@@ -1,0 +1,24 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(off) just(left ) pad('')
+         hilite(uscore) color(turq)
+   ¬ type(output) intens(high) caps(on ) just(left ) pad('')
+         hilite(uscore)
+   ! type(text) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++---------------------% TSO Mail Nick Name List Display +-----------------------
+%Command ===>_zcmd
+%
++
+`   Nick Name%===>¬NICKNAME+    Nick Name for Distribution list
++
+!   Use the Nick Name List Processing dialog to review or update this list.
++
+)Init
+)Proc
+)End

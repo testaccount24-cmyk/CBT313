@@ -1,0 +1,20 @@
+* This data set is the TSO/E ISPF Mail Dialog Safe Mail Control Data Set
+* It is updated by the TMAILSAF REXX procedure which can be called by
+* the TSO administrator (or anyone with update authorization to this
+* data set) although it should normally be called by the SAFEMAIL started
+* task.
+*
+* The format of this data set is:
+*
+*  Comments are indicated by an asterisk in column 1
+*
+*  Userids for which Safe Mail processing is to be performed are specified
+*  one per card image with the userid in column 1 for a length of 8.
+*
+*  Any information after column 8 is ignored
+*
+USERID1
+USERID2
+USERID3
+USERID4
+

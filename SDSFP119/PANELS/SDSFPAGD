@@ -1,0 +1,41 @@
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(on) just(left )
+   ` type( input) intens(high) caps(off) just(left )
+   % type(text) intens(high)
+   $ type(output) intens(high) color(blue) hilite(reverse)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+)Body Expand(\\)
+%-\-\- $cmd ~Open Print Data Set %-\-\-
++Command Input%===>_zcmd
++
++Data set name %===>_spdsn
++Member to use %===>_spmem   +
++Disposition   %===>_spd+       (OLD, NEW, SHR, MOD)
++
++If the data set is to be created, specify the following.
++Volume serial will be used to locate existing data sets if specified.
++
++Management class    %===>_spmc    + (Blank for default management class)
++Storage class       %===>_spsc    + (Blank for default storage class)
++  Volume serial     %===>_spvol +   (Blank for authorized default volume)
++Data class          %===>_spdc    + (Blank for default data class)
++  Space units       %===>_spal+     (BLKS, TRKS, CYLS, BY, KB, or MB)
++  Primary quantity  %===>_sppq    + (In above units)
++  Secondary quantity%===>_spsq    + (In above units)
++  Directory blocks  %===>_spdir   + (Zero for sequential data set)
++  Record format     %===>_sprecfm+
++  Record length     %===>_splrecl+
++  Block size        %===>_spblksiz+ (Zero for System Determined)
+)Init
+ .cursor = spdsn
+ .help = ISFJPOD
+)Proc
+ ver (&spdsn,nb,dsname)
+ ver (&spmem,dsname)
+ &spd = trans(trunc(&spd,1) O,OLD N,NEW S,SHR M,MOD *,*)
+ ver (&spd,list,OLD,NEW,SHR,MOD)
+ if (&spd = NEW)
+    ver (&spal,nb)
+    ver (&sppq,nb)
+)end

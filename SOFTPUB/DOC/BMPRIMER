@@ -1,0 +1,1037 @@
+:prolog.
+:revision id=one run=yes.
+:docprof duplex=sb justify=yes ldrdots=yes figlist=nopage toc='*2'.
+:title.
+BookManager READ/MVS Primer:
+Using Commands
+:date.
+:author.Douglas H. Adams
+.***********************************************************************
+:address.
+Information Systems Center
+Rockwell International Corporation
+2201 Seal Beach Boulevard
+P.O. Box 2515
+Seal Beach, California 90740-1515
+&rbl.
+(310) 797-2618
+:eaddress.
+.***********************************************************************
+:figdef place=inline concat=yes width=column frame=none.
+:figdef place=inline concat=yes width=column frame=box id=command.
+:eprolog.
+.***********************************************************************
+:frontm.
+:tipage.
+.***********************************************************************
+:synopsis.
+:p.This Primer briefly describes how to use BookManager:
+:ul compact.
+:li.How to invoke BookManager.
+:li.How to find books.
+:li.How to display books.
+:li.How to search books.
+:eul.
+:esynopsis.
+.***********************************************************************
+:notices.
+:p.This document describes the Rockwell Information Systems Center
+implementation of BookManager READ/MVS. The command to invoke
+BookManager, and the initial panels which display categories and lists
+of bookshelves, were written by Rockwell. The concept of a category is
+also a Rockwell invention. Panels with an action bar at the top are all
+supplied by IBM.
+:enotices.
+.***********************************************************************
+:preface.
+:p.This is one of two complementary documents:
+:ul.
+:li.:hp2.BookManager Primer: Using Commands:ehp2. focuses on
+the use of commands to request BookManager actions.
+:li.:hp2.BookManager Primer: Using the Action Bar:ehp2. focuses on
+the use of the action bar and pull down menus to request BookManager
+actions.
+:eul.
+:p.Commands are generally better for frequent BookManager users.  The
+advantages are:
+:ul.
+:li.They are faster.
+:li.They are more familiar to most ISPF users.
+:li.Some BookManager facilities are available only in this form.
+:eul.
+:p.The action bar and pull down menus are generally better for new or
+infrequent BookManager users.  The advantages are:
+:ul.
+:li.There is no need to remember command names and parameters.
+:li.Some BookManager facilities are available only in this form.
+:eul.
+:p.You may, of course, use a combination of these two methods.
+:toc.
+.***********************************************************************
+:figlist.
+.***********************************************************************
+:body.
+.***********************************************************************
+:h1.BookManager Primer: Using Commands
+.***********************************************************************
+:h2 subject=Introduction.Introduction
+:p.BookManager provides online access to over 2000 IBM publications.
+It also provides access to a variety of ISC and Rockwell Corporate
+publications, such as the Corporate Computing Manual (CCM), Technical
+Bulletins (TBs), User News, Corporate Policies, etc.
+:p.This BookManager Primer provides procedures for accessing the
+information in these publications.  The intent is to guide you
+immediately into productive use of BookManager. The most frequently used
+commands are covered. However many BookManager features are omitted.
+See the bibliography for additional information.
+.***********************************************************************
+:h2 subject=Concepts.Concepts
+:h3.Hierarchy of Panels
+:p.BookManager maintains its books in a hierarchical form:
+:ol compact.
+:li.A list of categories of bookshelves.
+:li.Categories (a category is a list of bookshelves).
+:li.Bookshelves (a bookshelf is a list of related books).
+:li.Books.
+:eol.
+:p.The first two of the above are provided by a Rockwell written front
+end to BookManager.
+:h3.Common User Access (CUA)
+:p.BookManager may be the first mainframe based :hp7.CUA:ehp7.
+application you have encountered. CUA is a framework which gives all
+applications a similar look and feel, regardless of the hardware and
+software platforms:
+:ul compact.
+:li.System/370 and System/390 mainframes
+:ul compact.
+:li.MVS
+:li.VM
+:eul.
+:li.AS/400 minicomputers
+:li.Personal computers
+:eul.
+:p.IBM's direction is for all software to use the CUA interface.  So
+experience with BookManager will be very useful in the future.
+:p.The original ISPF interface is command driven. It is oriented toward
+selecting actions (e.g., Browse or Edit), then selecting an object
+(e.g., a data set or PDS member) on which to perform that action.
+:p.CUA is primarily a graphical interface, so only a subset of it is
+applicable to non-programmable terminals.  It is oriented toward
+selecting an object first, then selecting an action. An example of this
+is PDF Option 3.4 (DSLIST): you display a list of objects (data sets),
+then choose an action (Browse, Edit, Delete, etc.) to perform on one of
+those objects.
+:p.This Primer is intended for current ISPF users. It ignores many of
+the CUA features. However an understanding of some of them is required.
+The CUA elements which are significant in this document are
+:hp7.Pop-up Windows:ehp7. and :hp7.Program Function Keys:ehp7..
+:h4.Pop-up Windows
+:p.Pop-up windows temporarily overlay a portion of the screen. They are
+typically used when you must make a decision concerning some action.
+:h4.Program Function Keys (PFKs)
+:p.In the original ISPF, PFKs perform the same function throughout an
+application. This can be wasteful, since often some of the keys have no
+meaning in portions of an application. For example RCHANGE (F6/F18)
+has no meaning under PDF Browse.  Under CUA, PFK definitions are
+associated with a panel. This allows PFKs to be assigned to actions
+which are useful in the context of that panel.  To help you keep track
+of PFK definitions, they are displayed at the bottom of each panel. For
+example:
+:fig.
+:screen view=bot.
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example Program Function Key (PFK) Display
+:efig.
+:h4.EXIT and CANCEL Commands
+:p.Note the definitions of :rk.F3:erk. and :rk.F12:erk. above.
+:rev refid=one.
+You may see :rk.F15:erk.instead of :rk.F3:erk., and :rk.F24:erk. instead
+of :rk.F12:erk..
+:erev refid=one.
+:hp2.Exit:ehp2. is like a cross between the END and RETURN commands. It
+ends a function or application. :hp2.Cancel:ehp2. removes the current
+panel without processing it, and returns to the previous panel in the
+hierarchy. :hp2.Exit:ehp2. is more powerful than
+:hp2.Cancel:ehp2..  This can be confusing, because the original ISPF
+default definition for F12 was RETURN.
+:p.Under BookManager, :hp2.Cancel:ehp2. must be used for pop-up
+windows.
+:rev refid=one.
+:hp2.Exit:ehp2. cannot be used.
+:erev refid=one.
+:p.:hp2.Exit:ehp2. returns:
+:ul compact.
+:li.from a book to a bookshelf
+:li.from a bookshelf to a bookshelf list (category)
+:li.from a bookshelf list to the category list
+:li.from the category list.
+:eul.
+:h3.Hypertext Links
+:p.ISPF users are accustomed to "vertically" organized applications.
+You go "down" by selecting options from a menu. You go "up" by using
+commands such as END or RETURN (or equivalent PFKs).
+:p.BookManager has this "vertical" organization (using :hp2.Exit:ehp2.
+and :hp2.Cancel:ehp2.), but adds a "horizontal" dimension.  Suppose you
+are reading a hardcopy book, and you come across a reference to some
+other part of the book.  You might stick your finger in the book to save
+your place and then turn to the referenced page.  After you've read the
+referenced material, you then turn back to where you left off.  A
+:hp7.hypertext link:ehp7. is the softcopy equivalent of this.  You
+:hp7.link:ehp7. "horizontally" to referenced material. Then you
+:hp7.unlink:ehp7. to return to your previous place. But BookManager has
+more fingers than you do, so you can link through several levels.
+:p.The important thing to keep in mind is that no matter how many
+hypertext links you've invoked, you're still only one level deep
+vertically.
+:rev refid=one.
+Therefore :hp2.Exit:ehp2. or :hp2.Cancel:ehp2. will exit from the book.
+:erev refid=one.
+.***********************************************************************
+:h2 subject='Invoking BookManager'.Invoking BookManager
+:h3.Command line
+:p.BookManager can be invoked from any ISPF command line with the
+:hp2.BOOKMAN:ehp2. or :hp2.ROCKLIB:ehp2. command:
+:fig refid=command.
+:xmp.
+COMMAND ===> bookman
+:exmp.
+:efig.
+:pc.or
+:fig refid=command.
+:xmp.
+OPTION  ===> bookman
+:exmp.
+:efig.
+:h3.Information Center Menu
+:p.BookManager can also be selected from the Information Center Menu as
+:hp7.option 11  ROCKLIB:ehp7.:
+:fig.
+:screen.
+ --------------  TSO/E INFORMATION CENTER FACILITY USER SERVICES  --------------
+ OPTION ===>
+
+ Type the desired option at the cursor position.              USERID   - $A1019
+                                                              TIME     - 12:14
+    T  TUTORIAL   - Learn about Information Center Facility   TERMINAL - 3278
+    0  OPTIONS    - Rockwell options for ISPF                 PF KEYS  - 24
+    1  ISPF/PDF   - Use ISPF/PDF services                     CENTER   - WCC1
+    2  CHARTING   - Create charts/graphs
+    3  ANALYSIS   - APL data analysis/reporting/decision support
+    4  PROGRAM    - Use program creation/execution services
+    5  DATABASE   - Database Management
+    6  MESSAGES   - Transmit and receive messages
+    7  ACF2       - Set and test ACF2 rules and passwords
+    8  INFO BOOTH - Assorted on-line documentation and information
+    9  NEWS       - Select and view TSO news items
+   10  PROBLEM    - Report user problems to ISC Service Support
+   :hp2.11  ROCKLIB    - Rockwell Library Services (Softcopy Publications):ehp2.
+
+    X  EXIT       - Exit from the Information Center Facility
+    C  CHANGES    - New and changed features on the Info Center menu
+
+ To view PF key definitions, type KEYS on COMMAND or OPTION line of any panel.
+
+:escreen.
+:efig.
+.cp
+.***********************************************************************
+:h2 subject='Selecting a Category'.Selecting a Category
+:fig.
+:p.Immediately after invoking the BOOKMAN command, you will see a panel
+similar to the following:
+:screen.
+ -------------------  Softcopy Publications Selection Menu    ROW 1 TO 13 OF 14
+ Command ===>                                                  Scroll ===> CSR
+
+ To select a category, type any nonblank character to left of the category
+ name and press ENTER, or move the cursor to that row and press ENTER.
+
+ Sel  Category
+
+ _    Corporate Offices Publications
+ _    Default Bookshelves
+ _    General Usage Publications
+ _    Global Employment Management System (GEMS)
+ _    Hardware Publications
+ _    IBM Technical Publications
+ _    ISC Computing Operations Bulletins
+ _    ISC Computing Operations Procedures
+ _    ISC Corporate Computing Manuals (CCM)
+ _    ISC Internal Publications
+ _    ISC Technical Bulletins and User News
+ _    Softcopy (BookManager) Usage and Information
+ _    SHARE Systems Management Automation Journals
+ _    User Group (Data Processing) Agendas
+  F1=HELP      F2=SPLIT     F3=END       F4=RETURN    F5=RFIND     F6=RCHANGE
+  F7=UP        F8=DOWN      F9=SWAP     F10=         F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Categories of Bookshelves
+:efig.
+:p.This is a list of categories of bookshelves. Each category contains
+a list of one or more bookshelves.  The :hp2.Default Bookshelves:ehp2.
+category contains a list of all available bookshelves. The other
+categories are subsets of the default.
+:h3.FINDing a Category
+:p.You can scroll through this list. Or you can enter a
+:hp2.FIND:ehp2. (:hp2.F:ehp2.) command for some character string in the
+category descriptions.  The :hp2.FIND:ehp2. command operand may contain
+blanks.  You can also use the :hp2.RFIND:ehp2. command (usually
+:rk.F5:erk. or :rk.F17:erk.).
+:h3.Selecting a Category
+:p.You can select a category by placing the cursor next to it and
+pressing the :rk.Enter:erk. key. You can optionally type a nonblank
+character.
+.cp
+.***********************************************************************
+:h2 subject='Selecting a Bookshelf'.Selecting a Bookshelf
+:fig.
+:p.If you select the the :hp2.Default Bookshelves:ehp2. category, you
+will see a panel similar to the following:
+:screen.
+ ---------------------  Softcopy Publications Selection  --  ROW 1 TO 11 OF 247
+ Command ===>                                                  Scroll ===> CSR
+
+                            Default Bookshelves
+
+ To make a selection, type any nonblank character to left of the description
+ and press ENTER, or move the cursor to that row and press ENTER.
+
+ Sel  Description
+
+ _    dpAccounting Manager/MVS V1R1.1
+ _    Ada/370 R2
+ _    Auto Net Oper(ANO)
+ _    AD/Cycle C/370 Compiler
+ _    AD/Cycle CoOperative Development Environment Bookshelf
+ _    AD/Cycle COBOL Structuring Facility V2R2
+ _    AD/Cycle Dictionary Services/MVS R2
+ _    AD/Cycle LE/370
+ _    AD/Cycle PL/I MVS and VM
+ _    AFP Architecture References
+ _    BookManager READ/DOS
+ _    BookManager READ/MVS
+  F1=HELP      F2=SPLIT     F3=END       F4=RETURN    F5=RFIND     F6=RCHANGE
+  F7=UP        F8=DOWN      F9=SWAP     F10=         F11=Retrieve F12=Cancel
+:escreen.
+:figcap.The Default Bookshelf
+:efig.
+:p.This is a list of bookshelves. Each bookshelf contains a list of
+related books. The same book may exist on more than one bookshelf.
+.cp
+:h3.FINDing a Bookshelf
+:p.You can scroll through this list.  Or you can issue a :hp2.FIND:ehp2.
+(:hp2.F:ehp2.) command for a character string in the bookshelf
+descriptions.  The :hp2.FIND:ehp2. command operand may contain blanks.
+You can also use the :hp2.RFIND:ehp2. command (usually :rk.F5:erk. or
+:rk.F17:erk.).
+:p.For example, if you issue the following :hp2.FIND:ehp2. command:
+:fig.
+:screen view=top.
+ ---------------------  Softcopy Publications Selection  --  ROW 1 TO 19 OF 247
+ Command ===> f mvs/esa 4.3                                    Scroll ===> CSR
+:escreen.
+:efig.
+:pc.you will see a panel similar to the following:
+:fig.
+:screen.
+ ---------------------  Softcopy Publications Selection   ROW 155 TO 165 OF 247
+ Command ===>                                                  Scroll ===> CSR
+
+                            Default Bookshelves
+
+ To make a selection, type any nonblank character to left of the description
+ and press ENTER, or move the cursor to that row and press ENTER.
+
+ Sel  Description
+
+ _    MVS/ESA 4.3 JES2 Bookshelf
+ _    MVS/ESA 4.3 JES3 Bookshelf
+ _    MVS/SP 3.1 JES2 Bookshelf
+ _    MVS/SP 3.1 JES3 Bookshelf
+ _    Network Queuing System/MVS
+ _    NetView DM R3
+ _    NetView DM R4
+ _    NetView FTP
+ _    NCA/MVS
+ _    NCP V5R4, SSPV3R6      .-------------------.
+ _    NCP V6R1               | MVS/ESA 4.3 Found |
+ _    NPM Release 6          '-------------------'
+  F1=HELP      F2=SPLIT     F3=END       F4=RETURN    F5=RFIND     F6=RCHANGE
+  F7=UP        F8=DOWN      F9=SWAP     F10=         F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Result of a FIND Command
+:efig.
+:p.The list has been scrolled to a bookshelf which matches the specified
+string.
+:h3.Selecting a Bookshelf
+:p.You can select a bookshelf by placing the cursor next to it and
+pressing the :rk.Enter:erk. key. You can optionally type a nonblank
+character.
+.cp
+.***********************************************************************
+:h2 subject='Selecting a Book'.Selecting a Book
+:fig.
+:p.If you select the :hp2.MVS/ESA 4.3 JES3 Bookshelf:ehp2. you will see
+a panel similar to the following:
+:screen.
+   Books  View  Search  Group  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+                                IAT4BS00 Bookshelf
+
+    Document                                                Books 1 to 12 of 68
+    Number            Book Title                                       Date
+ __ GC28-1644-04   MVS/ESA V4 Assembler Programming Guide              93/03/26
+ __ GC28-1642-04   MVS/ESA V4 Assembler Programming Reference          93/03/26
+ __ GC28-1645-04   MVS/ESA V4 Authorized Assembler Programming Guide   93/03/26
+ __ GC28-1647-04   MVS/ESA V4 Authorized Assembler Reference ALE-DYN   93/03/26
+ __ GC28-1648-04   MVS/ESA V4 Authorized Assembler Reference ENF-IXC   93/03/26
+ __ GC28-1649-04   MVS/ESA V4 Authorized Assembler Reference LLA-SDU   93/03/26
+ __ GC28-1650-04   MVS/ESA V4 Authorized Assembler Reference SET-WTO   93/03/26
+ __ GC28-1112-03   MVS/ESA V4 Authorized Callable Services             93/03/26
+ __ GC28-1133-01   MVS/ESA V4 APPC/MVS Handbk for OS/2 Administrator   93/03/26
+ __ GC28-1672-01   MVS/ESA V4 Batch Local Shared Resource Subsystem    93/03/26
+ __ GC28-1639-03   MVS/ESA V4 Callable Services for HLLs               93/03/26
+ __ GC28-1615-04   MVS/ESA V4 Configuration Program                    93/03/26
+ __ GC28-1608-05   MVS/ESA V4 Conversion Notebook                      93/03/26
+  F1=Help      F2=Split     F3=Exit      F4=Search    F5=Refresh   F6=Describe
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.The MVS/ESA 4.3 JES3 Bookshelf
+:efig.
+:p.This is a bookshelf (a list of related books).
+.cp
+:h3.Scrolling the Bookshelf
+:p.You can scroll through the list using the :hp2.Bkwd:ehp2. and
+:hp2.Fwd:ehp2. keys (usually :rk.F7:erk. and :rk.F8:erk. or
+:rk.F19:erk. and :rk.F20:erk.).
+:p.You :hp8.cannot:ehp8. use a :hp2.FIND:ehp2. command.
+:fig.
+:p.For example, if you scroll down, you will see:
+:screen.
+   Books  View  Search  Group  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+                                IAT4BS00 Bookshelf
+
+    Document                                               Books 25 to 36 of 68
+    Number            Book Title                                       Date
+ __ GC28-1631-03   MVS/ESA V4 IPCS User's Guide                        93/03/26
+ __ GC28-1654-03   MVS/ESA V4 JCL Reference                            93/03/26
+ __ GC28-1653-03   MVS/ESA V4 JCL User's Guide                         93/03/26
+ __ GC23-0090-00   MVS/ESA V4 JES3 Commands                            92/09/25
+ __ GC23-0087-00   MVS/ESA V4 JES3 Conversion Notebook                 92/09/25
+ __ SC23-0089-00   MVS/ESA V4 JES3 Init and Tuning Ref                 92/09/25
+ __ SC23-0088-00   MVS/ESA V4 JES3 Initialization and Tuning Guide     92/09/25
+ __ GC23-0086-00   MVS/ESA V4 JES3 Introduction                        92/06/23
+ __ GC23-0091-00   MVS/ESA V4 JES3 Messages                            92/09/25
+ __ GC28-1601-05   MVS/ESA V4 Library Guide                            93/03/26
+ __ GC28-1618-00   MVS/ESA V4 OLTEP                                    93/03/26
+ __ GC28-1110-02   MVS/ESA V4 Planning: APPC Management                93/03/26
+ __ GC28-1171-00   MVS/ESA V4 Planning: B1 Security                    93/03/26
+  F1=Help      F2=Split     F3=Exit      F4=Search    F5=Refresh   F6=Describe
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Scrolling a Bookshelf
+:efig.
+:h3.Selecting a Book
+:p.To select a book from this list, place the cursor on the line for
+that book and press the :rk.Enter:erk. key.
+.cp
+.***********************************************************************
+:h2 subject='Displaying a Book'.Displaying a Book
+:fig.
+:p.For example, if you select :hp2.MVS/ESA V4 JCL Reference:ehp2.,
+you will see:
+:screen.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+ CONTENTS  Table of Contents               &copyr Copyright IBM Corp. 1988, 1993
+                                                    Topic lines 1 to 14 of 1127
+ COVER         Book Cover
+ NOTICES       Notices
+ EDITION       Edition Notice
+ CONTENTS      Table of Contents
+ FIGURES       Figures
+ FRONT_1         Notices
+ FRONT_1.1         Trademarks
+ PREFACE       About This Book
+ PREFACE.1       Who Should Use This Book
+ PREFACE.2       Related Information
+ PREFACE.2.1       Corequisite Book
+ PREFACE.2.2       Referenced Books
+ PREFACE.3       Related Products
+ CHANGES       Summary of Changes
+ 1.0           Chapter 1.  Job Control Statements
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Selecting a Book (Table of Contents)
+:efig.
+:p.This is the Table of Contents.
+.cp
+:h3.Scrolling the Table of Contents
+:p.You can scroll through the table of contents using the
+:hp2.Bkwd:ehp2. and :hp2.Fwd:ehp2. keys.
+:p.:hp8.Don't:ehp8. use a :hp2.FIND:ehp2. command at this point. It
+doesn't work the way you'd expect.
+:p.If you scroll down, you will see:
+:fig.
+:screen.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+ CONTENTS  Table of Contents               &copyr Copyright IBM Corp. 1988, 1993
+                                                 Topic lines 113 to 126 of 1127
+ 11.11.3           Relationship to Other Parameters
+ 11.11.4           Examples of the AVGREC Parameter
+ 11.12           BLKSIZE Parameter
+ 11.12.1           Subparameter Definition
+ 11.12.2           Defaults
+ 11.12.3           Overrides
+ 11.12.4           Relationship to Other Control Statements
+ 11.12.5           Example of the BLKSIZE Parameter
+ 11.13           BURST Parameter
+ 11.13.1           Subparameter Definition
+ 11.13.2           Defaults
+ 11.13.3           Overrides
+ 11.13.4           Relationship to Other Parameters
+ 11.13.5           Relationship to Other Control Statements
+ 11.13.6           Example of the BURST Parameter
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Scrolling a Table of Contents
+:efig.
+:h3.Selecting a Topic via a Hypertext Link
+:p.You can select a topic simply by placing the cursor on the line
+containing that topic and pressing the :rk.Enter:erk. key.
+This is an example of a :hp7.hypertext link:ehp7..
+.cp
+.***********************************************************************
+:h2 subject='Selecting a Topic from the Table of Contents'.
+Selecting a Topic from the Table of Contents
+:fig.
+:p.For example, if you select :hp7.BLKSIZE Parameter:ehp7., you will
+see:
+:screen.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+ 11.12  BLKSIZE Parameter                  &copyr Copyright IBM Corp. 1988, 1993
+                                                      Topic lines 1 to 14 of 24
+
+    Parameter Type:  Keyword, optional
+
+
+    Purpose:  Code the BLKSIZE parameter to specify the maximum length, in
+    bytes, of a block.
+
+
+    Syntax
+
+
+
+
+        BLKSIZE=bytes
+
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Selecting a Topic
+:efig.
+:p.This is the initial display of a selected topic.
+:h3.Hypertext Link
+:p.You have moved horizontally via a hypertext link.
+:p.You have :hp2.not:ehp2. moved vertically. This means a
+:hp2.Cancel:ehp2. or :hp2.Exit:ehp2. command will exit the book and
+return to the bookshelf.
+:h3.Scrolling the Text
+:p.You can scroll through the text using the :hp2.Bkwd:ehp2. and
+:hp2.Fwd:ehp2. keys.
+.cp
+.***********************************************************************
+:h2 subject='Selecting a Subtopic'.Selecting a Subtopic
+:fig.
+:p.For example, if you scroll down, you will see:
+:screen.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+ 11.12  BLKSIZE Parameter                  &copyr Copyright IBM Corp. 1988, 1993
+                                                     Topic lines 15 to 24 of 24
+
+
+
+
+    Subtopics
+    11.12.1 Subparameter Definition
+    11.12.2 Defaults
+    11.12.3 Overrides
+    11.12.4 Relationship to Other Control Statements
+    11.12.5 Example of the BLKSIZE Parameter
+
+
+
+
+
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Scrolling a Topic (Subtopic List)
+:efig.
+:h3.Scrolling Subtopics
+:p.You can continue scrolling to view the subtopics in order,
+using the :hp2.Bkwd:ehp2. and :hp2.Fwd:ehp2. keys.
+:h3.Hypertext Links to Subtopics
+:p.Or you can select a subtopic by placing the cursor on a subtopic line
+and pressing the :rk.Enter:erk. key. This will cause you to move
+horizontally via another hypertext link. There will be no movement
+vertically.
+.***********************************************************************
+.cp
+:h2 subject='Returning to the Table of Contents'.
+Returning to the Table of Contents
+:h3.Hypertext Unlink
+:p.You can return to the Table of Contents by pressing the
+:hp2.Unlink:ehp2. key (:rk.F4:erk. or :rk.F16:erk.). The
+:hp2.Unlink:ehp2. key backs you up horizontally one hypertext link at a
+time.
+:p.Since hypertext links do not change your position vertically, you
+cannot use :hp2.Exit:ehp2. or :hp2.Cancel:ehp2.. Either of these
+commands will move you upward vertically in the panel hierarchy and
+cause you to exit from the book back to the bookshelf.
+:h3.The CONTENTS Command
+:p.Alternatively you can enter the :hp2.CONTENTS:ehp2. (:hp2.CON:ehp2.)
+command:
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> con_____________________________________________ SCROLL ===> CSR
+:escreen.
+:rev refid=one.
+:p.The Table of Contents will then be redisplayed at the point where you
+left it.
+:erev refid=one.
+The :hp2.CONTENTS:ehp2. command does not change your position either
+vertically or horizontally.
+:rev refid=one.
+:fig.
+:screen.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> ________________________________________________ SCROLL ===> CSR
+
+ CONTENTS  Table of Contents               &copyr Copyright IBM Corp. 1988, 1993
+                                                 Topic lines 113 to 126 of 1127
+ 11.11.3           Relationship to Other Parameters
+ 11.11.4           Examples of the AVGREC Parameter
+ 11.12           BLKSIZE Parameter
+ 11.12.1           Subparameter Definition
+ 11.12.2           Defaults
+ 11.12.3           Overrides
+ 11.12.4           Relationship to Other Control Statements
+ 11.12.5           Example of the BLKSIZE Parameter
+ 11.13           BURST Parameter
+ 11.13.1           Subparameter Definition
+ 11.13.2           Defaults
+ 11.13.3           Overrides
+ 11.13.4           Relationship to Other Parameters
+ 11.13.5           Relationship to Other Control Statements
+ 11.13.6           Example of the BURST Parameter
+  F1=Help      F2=Split     F3=Exit      F4=Unlink    F5=Notes     F6=Review
+  F7=Bkwd      F8=Fwd       F9=Swap     F10=Actions  F11=Retrieve F12=Cancel
+:escreen.
+:figcap.Example of Redisplay of the Table of Contents
+:efig.
+:erev refid=one.
+.cp
+.***********************************************************************
+:h2 subject='Searching for a Word or Phrase in a Book'.
+Searching for a Word or Phrase in a Book
+:p.The preceding technique is useful if you know exactly what you're
+looking for. Often this is not the case.
+:rev refid=one.
+:h3.Searching for a Topic with the SEARCH Command
+:erev refid=one.
+The :hp2.SEARCH:ehp2. (:hp2.S:ehp2.) command will find all occurrences
+of a word or phrase.
+:p.For example, to search for the word :hp7.BLKSIZE:ehp7., enter:
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> s blksize_______________________________________ SCROLL ===> CSR
+:escreen.
+:p.You will then see a list of topics that match the word
+:hp7.BLKSIZE:ehp7.:
+:fig.
+:screen.
+ .-----------------------------------------------------------------------------.
+ |                        List All Topics with Matches                         |
+ | Command ===> ____________________________________________ SCROLL ===> CSR   |
+ |                                                                             |
+ | Fuzzy matches for: blksize                                                  |
+ |                                               Search matches 1 to 15 of 25  |
+ | 11.12    BLKSIZE Parameter                                                  |
+ | 11.12.1  Subparameter Definition                                            |
+ | 11.12.3  Overrides                                                          |
+ | 11.12.4  Relationship to Other Control Statements                           |
+ | 11.12.2  Defaults                                                           |
+ | 11.18.2  Relationship to Other Parameters                                   |
+ | 11.20.5  DCB Subparameters                                                  |
+ | 11.12.5  Example of the BLKSIZE Parameter                                   |
+ | 11.20.4  Examples of the DCB Parameter                                      |
+ | 11.20    DCB Parameter                                                      |
+ | 11.20.3  Relationship to Other Parameters                                   |
+ | 11.39.1  Subparameter Definition                                            |
+ | 11.8.2   Relationship to Other Parameters                                   |
+ | 11.56.4  Relationship to Other Parameters                                   |
+ | 11.8.1   Defaults                                                           |
+ |  F1=Help     F2=Split    F4=Text     F5=No Text  F6=Review   F7=Bkwd        |
+ |  F8=Fwd      F9=Swap    F10=Explain F12=Cancel                              |
+ '-----------------------------------------------------------------------------'
+:escreen.
+:figcap.Example of Searching for a Word
+:efig.
+:p.This is a list to topics which match the specified word or phrase.
+The list is ordered with the best matches first.  The default is a
+:hp1.fuzzy:ehp1. search. That is, BookManager not only searches for the
+specified word
+:rev refid=one.
+or phrase
+:erev refid=one.
+as entered, but for variations on that word
+:rev refid=one.
+or phrase
+:erev refid=one.
+and for
+synonyms.
+.cp
+:h4.Pop-up Window and the Cancel Key
+:p."List All Topics with Matches" is a :hp7.pop-up window:ehp7.  You
+have now moved downward vertically in the panel hierarchy. You can
+change your mind and move upward (return to the previous panel) by
+pressing the
+:hp2.Cancel:ehp2. key.  Note that there is no :hp2.Exit:ehp2. key.
+:h4.Selecting a Topic
+:p.You can select a topic from the search list by placing the cursor on
+the desired topic and pressing the :rk.Enter:erk. key.
+:p.This is :hp8.not:ehp8. a hypertext link.
+:rev refid=one.
+It is the equivalent of simply flipping to a different page in the book.
+:h3.Searching for a Topic with the "Set Up Search" Pop-up Window
+:p.You may also enter the :hp2.SEARCH:ehp2 command with no operands.
+This will display a pop-up window:
+:fig.
+:screen.
+   .------------------------------------------------------------------.
+   |                          Set Up Search                           |
+   |                                                                  |
+   |                                                                  |
+   | Search for . . blksize                                           |
+   |                                                                  |
+   |  or                                                              |
+   |                                                                  |
+   | Modify a previous search request:                                |
+   |                ____________________________________________      |
+   |                ____________________________________________      |
+   |                ____________________________________________      |
+   |                ____________________________________________      |
+   |                ____________________________________________      |
+   | Phrase separator . . . . ,                                       |
+   | Wildcard character . . . *                                       |
+   | Current matching option  1   1.  Fuzzy matching                  |
+   |                              2.  Exact matching, any case        |
+   |                              3.  Exact matching, including case  |
+   |                                                                  |
+   |                                                                  |
+   |                                                                  |
+   | F1=Help F4=Wordchk F5=Synonyms F12=Cancel                        |
+   '------------------------------------------------------------------'
+ :escreen.
+ :figcap.Setting up a Search Request with a Pop-up Window
+ :efig.
+ :p.Simply type in a word or phrase and press :rk.Enter:erk.. The
+advantages of this technique are that:
+:ul compact.
+:li.You can recall previous search requests.
+:li.You have an alternative to fuzzy matching.
+:eul.
+:erev refid=one.
+.cp
+.***********************************************************************
+:h2 subject='Displaying the List of Search Matches'.
+Displaying the List of Search Matches
+:p.Suppose you are currently viewing the first topic in the search list.
+How do you view the second topic? It is tempting to use the
+:hp2.Exit:ehp2. or :hp2.Cancel:ehp2. key.  However this will move you
+upward vertically, and return you to the bookshelf display. The
+:hp2.Unlink:ehp2. key won't work either, because you didn't get here via
+a hypertext link.
+:h3.Listing Search Matches
+:p.The command you want is :hp2.LIST SEARCHES:ehp2. (:hp2.L S:ehp2.):
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> l s_____________________________________________ SCROLL ===> CSR
+:escreen.
+:p.This will redisplay the "List All Topics with Matches"
+:rev refid=one.
+pop-up
+:erev refid=one.
+window:
+:rev refid=one.
+:fig.
+:screen.
+ .-----------------------------------------------------------------------------.
+ |                        List All Topics with Matches                         |
+ | Command ===> ____________________________________________ SCROLL ===> CSR   |
+ |                                                                             |
+ | Fuzzy matches for: blksize                                                  |
+ |                                               Search matches 1 to 15 of 25  |
+ | 11.12    BLKSIZE Parameter                                                  |
+ | 11.12.1  Subparameter Definition                                            |
+ | 11.12.3  Overrides                                                          |
+ | 11.12.4  Relationship to Other Control Statements                           |
+ | 11.12.2  Defaults                                                           |
+ | 11.18.2  Relationship to Other Parameters                                   |
+ | 11.20.5  DCB Subparameters                                                  |
+ | 11.12.5  Example of the BLKSIZE Parameter                                   |
+ | 11.20.4  Examples of the DCB Parameter                                      |
+ | 11.20    DCB Parameter                                                      |
+ | 11.20.3  Relationship to Other Parameters                                   |
+ | 11.39.1  Subparameter Definition                                            |
+ | 11.8.2   Relationship to Other Parameters                                   |
+ | 11.56.4  Relationship to Other Parameters                                   |
+ | 11.8.1   Defaults                                                           |
+ |  F1=Help     F2=Split    F4=Text     F5=No Text  F6=Review   F7=Bkwd        |
+ |  F8=Fwd      F9=Swap    F10=Explain F12=Cancel                              |
+ '-----------------------------------------------------------------------------'
+:escreen.
+:figcap.Example of Result of the List Searches Command
+:efig.
+:p.The cursor will be placed on the topic following the one you just
+displayed. You can then select another topic from the list. Or you can
+:hp2.Cancel:ehp2. the pop-up window.
+:erev refid=one.
+.***********************************************************************
+.cp
+:h2 subject='Displaying Consecutive Topics from the list of Search Matches'.
+Displaying Consecutive Topics from the List of Search Matches
+:p.If you want to display consecutive topics in the list, it is
+cumbersome to return to the list for each topic.
+:h3.The FIND Command
+:p.An alternative is the :hp2.FIND:ehp2. (:hp2.F:ehp2.) command. When
+used this way, BookManager's :hp2.FIND:ehp2.  command is similar to
+ISPF's RFIND command. Note that there is
+:hp8.no&rbl.RFIND&rbl.key:ehp8..
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> f_______________________________________________ SCROLL ===> CSR
+:escreen.
+:p.Each time you issue the :hp2.FIND:ehp2. command, the next search
+topic will be displayed.
+:p.Even this short cut is cumbersome if you want to scan quickly through
+many items in the list.
+:h3.The REVIEW SEARCHES Command
+:p.An even shorter cut is to use the
+:hp2.REVIEW SEARCHES:ehp2. (:hp2.REV S:ehp2.) command.
+:p.The :hp2.REVIEW:ehp2. command :hp8.cannot:ehp8. be entered on the
+"List All Topics with Matches" window. You must first display one of the
+topics in the list.
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> rev s___________________________________________ SCROLL ===> CSR
+:escreen.
+:h3.The Review Key
+:p.Once the :hp2.REVIEW SEARCHES:ehp2. command has been entered, you can
+use the :hp2.Review:ehp2. key (:rk.F6:erk. or :rk.F18:erk.). The
+:hp2.Review:ehp2. key becomes the equivalent of the :hp2.FIND:ehp2.
+command (again,
+similar to the ISPF RFIND command).
+:rev refid=one.
+:p.Beware: the initial setting for the :hp2.Review:ehp2. key is
+:hp2.REVIEW TOPICSSEEN:ehp2., :hp8.not:ehp8. :hp2.REVIEW SEARCHES:ehp2.
+:erev refid=one.
+.cp
+.***********************************************************************
+:h2 subject='Searching a Bookshelf'.Searching a Bookshelf
+:p.If you are not sure which book(s) contain the topics you want, you
+can use the :hp2.SEARCH:ehp2. command on a :hp5.bookshelf:ehp5. display
+to search that entire bookshelf. This is quite fast.
+:h3.Searching a Bookshelf
+:p.For example, to search the entire MVS/ESA 4.3 JES3 Bookshelf for the
+word :hp7.blksize:ehp7., enter a :hp2.SEARCH:ehp2. command:
+:screen view=top.
+   Books  GoTo  Search  Notes  Services  Options  Help
+ ------------------------------------------------------------------------------
+
+ Command ===> s blksize_______________________________________ SCROLL ===> CSR
+:escreen.
+:fig.
+:p.You will see the following panel:
+:screen.
+ .-----------------------------------------------------------------------------.
+ |                        List All Books with Matches                          |
+ | Command ===> ____________________________________________ SCROLL ===> CSR   |
+ |                                                                             |
+ | 68 of 68 Books Searched                                                     |
+ | Fuzzy matches for: blksize                                                  |
+ |                                               Search matches 1 to 14 of 36  |
+ | GC28-1654-03  MVS/ESA V4 JCL Reference                                      |
+ | GC28-1612-04  MVS/ESA V4 System Data Set Definition                         |
+ | GC28-1658-03  MVS/ESA V4 System Messages Vol. 3 GFSA-IEB                    |
+ | GC28-1659-00  MVS/ESA V4 System Messages Vol. 4 IEC-IFD                     |
+ | GC28-1653-03  MVS/ESA V4 JCL User's Guide                                   |
+ | GC28-1637-04  MVS/ESA V4 Installation Exits                                 |
+ | GC28-1656-04  MVS/ESA V4 System Messages Vol. 1 ABA-ASA                     |
+ | GC28-1631-03  MVS/ESA V4 IPCS User's Guide                                  |
+ | GC33-6457-02  MVS/ESA V4 Hardware Configuration Definition                  |
+ | GC28-1615-04  MVS/ESA V4 Configuration Program                              |
+ | GC28-1645-04  MVS/ESA V4 Authorized Assembler Programming Guide             |
+ | GC28-1628-03  MVS/ESA V4 System Management Facilities (SMF)                 |
+ | GC28-1669-03  MVS/ESA V4 Service Aids                                       |
+ | GC28-1639-03  MVS/ESA V4 Callable Services for HLLs                         |
+ |  F1=Help     F2=Split    F7=Bkwd     F8=Fwd      F9=Swap    F10=Explain     |
+ | F12=Cancel                                                                  |
+ '-----------------------------------------------------------------------------'
+:escreen.
+:figcap.Example of Searching a Bookshelf
+:efig.
+:p.This is a list of all books with topics matching the word
+:hp7.blksize:ehp7.. This list is also ordered with the best matches
+first.
+.cp
+:h4.Pop-up Window and the Cancel Key
+:p."List All Books with Matches" is another pop-up window. You have now
+moved downward vertically
+:rev refid=one.
+:hp1.two levels:ehp2. in the panel hierarchy. If you change your mind
+and press the :hp2.Cancel:ehp2. key the "Set Up Search" panel will be
+displayed, and you must press :hp2.Cancel:ehp2. a second time.  Note
+that there is no :hp2.Exit:ehp2. key.
+:erev refid=one.
+:h3.Selecting a Book
+:p.You can select a book by placing the cursor on the desired book and
+pressing the :rk.Enter:erk. key.
+:rev refid=one.
+This will move downward vertically.
+:erev refid=one.
+You will then see the same "List All Topics with Matches" window as when
+you searched an individual book.
+:rev refid=one.
+:p.For example, if you select MVS/ESA V4 JCL Reference, you will see:
+:fig.
+:screen.
+ .-----------------------------------------------------------------------------.
+ |                        List All Topics with Matches                         |
+ | Command ===> ____________________________________________ SCROLL ===> CSR   |
+ |                                                                             |
+ | Fuzzy matches for: blksize                                                  |
+ |                                               Search matches 1 to 15 of 25  |
+ | 11.12    BLKSIZE Parameter                                                  |
+ | 11.12.1  Subparameter Definition                                            |
+ | 11.12.3  Overrides                                                          |
+ | 11.12.4  Relationship to Other Control Statements                           |
+ | 11.12.2  Defaults                                                           |
+ | 11.18.2  Relationship to Other Parameters                                   |
+ | 11.20.5  DCB Subparameters                                                  |
+ | 11.12.5  Example of the BLKSIZE Parameter                                   |
+ | 11.20.4  Examples of the DCB Parameter                                      |
+ | 11.20    DCB Parameter                                                      |
+ | 11.20.3  Relationship to Other Parameters                                   |
+ | 11.39.1  Subparameter Definition                                            |
+ | 11.8.2   Relationship to Other Parameters                                   |
+ | 11.56.4  Relationship to Other Parameters                                   |
+ | 11.8.1   Defaults                                                           |
+ |  F1=Help     F2=Split    F4=Text     F5=No Text  F6=Review   F7=Bkwd        |
+ |  F8=Fwd      F9=Swap    F10=Explain F12=Cancel                              |
+ '-----------------------------------------------------------------------------'
+:escreen.
+:figcap.Example of Selecting a Book after Searching a Bookshelf
+:efig.
+:p.You may then proceed in the same way as if you had entered a Search
+command for a book.
+:h4.Cancel and Exit
+:p.Vertical movement is a bit more complicated.
+:p.If you attempt to :hp2.Cancel:ehp2. the above panel, the "Set Up
+Searches" panel will be displayed. A second :hp2.Cancel:ehp2. will
+display the Table of Contents of the book. When you :hp2.Exit:ehp2. (or
+:hp2.Cancel:ehp2.)  the book, the "List All Books with Matches" panel
+will be redisplayed.
+:p.As explained above, it takes two more :hp2.Cancel:ehp2.s to get back
+to the bookshelf display.
+:erev refid=one.
+.cp
+.***********************************************************************
+:h2 subject='Bypassing the Initial Panels (Fast Path)'.
+Bypassing the Initial Panels (Fast Path)
+:p.The :hp2.BOOKMAN:ehp2. command supports operands which can bypass
+one or both of the initial panels.
+:h3.Selecting the Default Category (Bookshelf List)
+:p.The default category (bookshelf list) may be selected directly. This
+is equivalent to displaying the category list, then selecting the
+default category.
+:fig refid=command.
+:xmp.
+COMMAND ===> BOOKMAN DEfault
+:exmp.
+:efig.
+:h3.Finding a Category (Bookshelf List)
+:p.A :hp2.FIND:ehp2. command can be specified for a string in the
+the category list descriptions.
+This is equivalent to displaying the category list, then issuing a
+:hp2.FIND:ehp2. command.
+:fig refid=command.
+:xmp.
+COMMAND ===> BOOKMAN Find string
+:exmp.
+:efig.
+:h3.Finding a Bookshelf in the Default Bookshelf List
+:p.These two capabilities can be combined to find a string within the
+default bookshelf descriptions.
+:fig refid=command.
+:xmp.
+COMMAND ===> BOOKMAN DFind string
+:exmp.
+:efig.
+:h3.FIND and DFIND Behaviour
+:p.The :hp2.FIND:ehp2. and :hp2.DFIND:ehp2.  commands will display only
+those categories which have the specified character string within their
+descriptions.  If only one match is found then that item is opened.
+:p.The :hp2.FIND:ehp2. and :hp2.DFIND:ehp2.  commands will cause the
+BOOKMAN application to exit after the selections are processed. You will
+not be returned to the primary BookManager selection list.
+.***********************************************************************
+:bibliog.
+:p.This Primer is only an introduction to BookManager. For additional
+information, see the following books. They are available on the
+:hp2.BookManager READ/MVS:ehp2. bookshelf.
+:ul.
+:li.BookManager READ/MVS: Getting Started and Command Summary,
+SC38-2033.
+:li.BookManager READ/MVS: Displaying Online Books, SC38-2034.
+:eul.

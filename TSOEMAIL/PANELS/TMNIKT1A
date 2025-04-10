@@ -1,0 +1,42 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(off) just(left ) pad(nulls)
+         hilite(uscore) color(turq)
+   ¬ type( input) intens(high) caps(on ) just(left ) pad(nulls)
+         hilite(uscore)
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(text) intens(high) caps(off) just(asis ) color(turq)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body
++---------------------% TSO Mail Nick Name Update/Create +----------------------
+%Command ===>_zcmd
+%
++Enter/Verify:
++
+`   Nick Name%===>¬NICKNAME+    Nick Name you will use for this individual
+`   Userid   %===>¬USERID  +    Userid Electronic Mail userid
+`   Node *   %===>¬NODE                                                   +
+`   Name     %===>@NAME                                   +
+`   Internet %===>@INTERNET                               + optional
+`   Address  %===>@ADDRESS1                               +    "
+`   Address  %===>@ADDRESS2                               +    "
+`   Address  %===>@ADDRESS3                               +    "
+`   Address  %===>@ADDRESS4                               +    "
+`   Phone    %===>@PHONE                                  +    "
++
++
++   * a blank node will default to the the current node name
++
+%   Exit using PF3 to terminate update/creation
+)Init
+)Proc
+  ver (&nickname,nb)
+  if (&internet = &Z)
+    ver (&userid,nb)
+  ver (&name,nb)
+  if (&node = &Z)
+      &node = &center
+)End

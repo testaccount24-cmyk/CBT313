@@ -1,0 +1,16 @@
+        /*  Rexx ISPF Edit Macro                                       */
+
+        /* ----------------------------------------------------------- */
+        /*                                                             */
+        /*  This ISPF Edit Macro is used as an Alias for the ISPF EDIT */
+        /*  'CANCEL' command by the TMAILSND exec.                     */
+        /*                                                             */
+        /* ----------------------------------------------------------- */
+        Address ISREDIT "MACRO (PARM) NOPROCESS"
+
+        Address ISREDIT "DEFINE CANCEL RESET"  /* reset CANCEL back to normal */
+        Address ISREDIT "DEFINE END    RESET"  /* reset END    back to normal */
+
+        Address ISREDIT "END"
+        mailend = "CANCEL"
+        Address ISPEXEC "VPUT (MAILEND)"

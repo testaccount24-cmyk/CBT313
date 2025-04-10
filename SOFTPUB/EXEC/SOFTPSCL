@@ -1,0 +1,86 @@
+        /* rexx */
+        "%softpdft"
+        Address ISPEXEC "Vget (build index)"
+        null = ""
+        scl = null
+        old = null
+        scl_new.0 = 0
+        scl_kill.0 = 0
+        out.0 = 0
+        ddn = "SCL"random()
+
+        parse value build with "'" build "'" .
+        "Alloc f("ddn") shr reuse dsn('"build"(build)')"
+        "Execio * diskr" ddn "(Finis stem old."
+        "Alloc f("ddn") shr reuse dsn('"index".EBRMGMT.BKLSHELF')"
+        "Execio * diskr" ddn "(Finis stem new."
+        "Free f("ddn")"
+
+        /* now process the new. into a single string */
+        do i = 1 to new.0
+           parse value new.i with "SHELF" x dsn title
+           dsn = translate(dsn)
+           scl = scl i dsn
+           end
+        /* now process the old into a single string */
+        do i = 1 to old.0
+           if left(old.i,2) <> "S " then iterate
+           parse value old.i with "S" dsn title
+           dsn = translate(dsn)
+           old = old i dsn
+           end
+
+        /* now find out if any of the 'new' items really
+           are new */
+       c = scl_new.0
+       do i = 1 to new.0
+           parse value new.i with "SHELF" x dsn title
+           dsn = translate(dsn)
+           if wordpos(dsn,old) = 0 then do
+              pos = wordpos(dsn,scl) - 1
+              new_pub = word(scl,pos)
+              c = c + 1
+              scl_new.c = new.new_pub
+           end
+       end
+       scl_new.0 = c
+
+        /* now find out if any of the 'old' items are now
+           obsolete */
+       c = scl_kill.0
+       do i = 1 to old.0
+           if left(old.i,2) <> "S " then iterate
+           parse value old.i with "S" dsn title
+           dsn = translate(dsn)
+           if wordpos(dsn,scl) = 0 then do
+              pos = wordpos(dsn,old) -1
+              old_pub = word(old,pos)
+              c = c + 1
+              scl_kill.c = old.old_pub
+           end
+       end
+      scl_kill.0 = c
+
+       out.1 = "New Shelves" scl_new.0
+       c = 1
+       do i = 1 to scl_new.0
+          parse value scl_new.i with "SHELF" x dsn title
+          dsn = translate(dsn)
+          c = c + 1
+          out.c = "S" dsn title
+          end
+       c = c + 1
+       out.c = "   "
+       c = c + 1
+       out.c = "Obsolete or Unknown Shelves" scl_kill.0
+       do i = 1 to scl_kill.0
+          c = c + 1
+          out.c = scl_kill.i
+          end
+        out.0 = c
+
+       "Alloc f("ddn") shr ds('"build"(update)')"
+       "Execio * diskw" ddn "(Finis Stem out."
+       "Free f("ddn")"
+
+       Address ISPExec "Browse Dataset('"build"(update)')"

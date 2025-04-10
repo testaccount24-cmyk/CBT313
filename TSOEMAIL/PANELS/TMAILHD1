@@ -1,0 +1,33 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Defaults +-----------------------------
+%Command ===>_zcmd
+%
+
+`    TSO Mail Defaults are important as they provide the necessary information
+`    for the proper processing of your mail.
+`
+`    Your%Name, Mailing address`and%Electronic address`will be used in the
+`    messages that you send to others.
+`
+`    The current%Node`is used in the messages that you send to identify where
+`    the message is originating.
+`
+`    Specifying that you want the outgoing messages to be%Logged`will cause
+`    a copy of your messages to be placed into your TSO Mail table which will
+`    allow you to resend them and/or print them.
+`
+`    Specifying whether you want your outgoing messages to be%Acknowledged`
+`    will provide you with notification that your outgoing message has been
+`    read by the recipient.
+)Init
+)Proc
+  &zsel = *tmailhd2
+)End

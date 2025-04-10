@@ -1,0 +1,306 @@
+This file contains the Rockwell (now Kaiser) front-end to IBM's
+BookManager Read/MVS and is provided with not guarentee.  If you use it
+you should review it completely so that you understand it before
+installing for production use.
+
+The BMPRIMER in this PDS is a document written by Doug Adams, who was
+a very good friend and co-worker at Rockwell International.
+
+This application has been non-Rockwellized and has been Kaiserized
+so that it will work at my new employeer.
+
+Note:  I have changed jobs since I first released this application.  My
+new address information is:
+
+   Lionel B. Dyck
+   Kaiser Permanente
+   Walnut Creek, CA 94598
+   (925) 926-5332
+   Internet: lionel.b.dyck@kp.org
+
+>>>Overview.
+
+The IBM BookManager Read/MVS product is intended to display lists of softcopy
+publications and then individual softcopy publications.  It provides a 3 level
+hierarchy (Library Shelf -> Shelf -> Book).
+
+The Rockwell front-end provides an unlimited (but not to exceed in total 999)
+levels via a replacement for the Library Shelf known as Categories.  Categories
+may be nested and within a Category a Shelf, Book or sub-Category may be
+defined.  The IBM Read/MVS is invoked when a user selects either a Shelf or a
+Book for processing.
+
+There are two (2) elements to this front-end, a User Application and an
+Administrative Application which are described below.
+
+Access restrictions can be built into the application using information
+extracted by a Rockwell unique routine to extract the users department
+from the ACF2 data base.
+
+This application is written using TSO/E REXX and ISPF dialog elements.
+
+>>>Installation.
+
+This file contains the following members:
+
+   $DOC        Brief doc of what you are receiving
+   DOC         Some documentation on the application that our Tech Pubs
+               staff uses.
+   EXEC        REXX execs used by the dialog
+   MSGS        ISPF Messages
+   PANELS      ISPF Panels
+   SKELS       ISPF Skeleton
+   TABLE       Sample build table dataset
+
+All Members are in TSO XMIT format.  Issue a TSO RECEIVE
+INDS(dsn(member)) to convert the data into a usable dataset.
+
+>>>User Applications.
+
+The user interface to BookManager Read/MVS will be via the
+SOFTPUB exec instead of the BOOKMGR clist.  This is simplified by the addition
+of a command to the ISPF Command table (documented below).
+
+Command syntax from the ISPF command line is:
+
+   BOOKMAN  option
+
+   where option is:   null for the normal display of all categories that the
+                      user is authorized to view.
+
+           DEfault to display the DEFAULT Category
+
+           PRivate to display the users private shelf
+           OWn is an alias of Private
+
+           FInd xxx   - find the character string in the primary list
+           DFind xxx  - find the character string in the default all shelf list
+           DBFind xxx - find the character string in the default all book list
+
+
+>>>Administration Applications.
+
+   1.  Overview
+   2.  Administration Applications
+   3.  Upload Instructions
+   4.  Dialog Elements
+
+1. Overview
+
+   This administration application is written to support the locally
+   developed ISPF front-end interface to the IBM BookManager Read/MVS
+   product.  It is written using standard ISPF services and is driven
+   using procedures written in TSO/E REXX.
+
+   The Rexx procedure SOFTPDFT contains variables that define the
+   high-level qualifier for the softcopy application and the names of the
+   production and build control data sets.  The control data sets are
+   partitioned and contain text and ISPF tables.
+
+2. Administration Applications
+
+   This application is intended to be used by selected individuals to
+   define and control the Softcopy Publications environment.  The following
+   options are available as part of this application:
+
+   1+ Build            Build the Softcopy ISPF Tables
+
+      This application will take the BUILD member of the Softcopy
+      Work ISPF Table data set and construct a set of ISPF tables
+      that are used by the SOFTPUB application that is the front-end
+      to the IBM provided BookManager/Read MVS application.
+
+      The BUILD will copy the BUILD member into a member name MASTER
+      and rename previous MASTER members as OMASTnnn for future
+      reference.
+
+      Table Name "SOFTCOPY" is the primary ISPF table that defines the
+      hierarchy of softcopy categories.  Sub-tables are of the format
+      SFTggnnn, where 'gg' is a generation qualifier so that COPY can
+      be performed without impacting a currently active user.  'nnn'
+      is a sequential number starting with 001 for each category
+      defined.
+
+   2+ Review           Review Contents of Softcopy ISPF Tables
+
+      A simple ISPF and Rexx application to just display the work
+      control data set tables.  Simplier than the Test option to just
+      review what has been defined and built.
+
+   3+ Test             Test the built tables
+
+      This option will invoke the softcopy Display application using
+      a special parm that causes it to use the Work ISPF table data
+      set.
+
+   4+ Copy             Copy the built tables into Production
+
+      This option copies the current tables from the BUILD work data
+      set into the production data set.  Current minus 2 versions of
+      the tables are also removed.  Member GG is replaced which
+      defines the current generation of tables.
+
+   5+ Update Shelf     Update a Book Shelf (Edit)
+
+      Using ISPF Edit update a book shelf and then once the shelf
+      has been saved it is transmitted to the other softcopy
+      centers using MVS/BDT.
+
+
+   6+ Collect          Collect a report of all Book Shelves for use in 5
+
+      This option will list all data sets under the defined high-level
+      index.  From this list all Book Shelves (.BKSHELF) are checked for
+
+      -  If the second qualifier is UPLOAD then the index file is
+         checked and the .BKSHELF is updated to reflect the correct
+         dsname for the index.  All Book names are also updated with
+         the correct index and suffix and the correct control
+         statement inserted into the .BKSHELF.
+      -  The title of the shelf is extracted and saved along with
+         the dsname in member REPORT of the work control data set.
+      -  Prior to saving the REPORT member, the previous REPORT member
+         is processed and compared to find any new book shelves.  If
+         new shelves are found then member NEWSHELF is created with
+         just the new shelves.  This member can then be copied into
+         member BUILD under the Construct option.
+
+   7+ Update           Update the BUILD control member
+
+      Invokes ISPF Edit on the work control data set to allow the
+      administrator to update the BUILD member with new shelves from
+      member NEWSHELF - or to change the current BUILD member
+      structure.
+
+   8+ Index Build      Invoke BookManager Read/MVS Index Utility
+
+      Invoke the IBM provided Book Manager Read/MVS Index creation
+      utility.
+
+   9+ Usage Report     Generate Softcopy Usage Reports
+
+      This option will generate a series of report files that
+      identify all softcopy files that are (1) installed,
+      (2) referenced, and (3) unreferenced.  A DCF tag'd file
+      is prepared with all referenced file names for reporting
+      and a REXX procedure is generated to delete all unreferenced
+      files.
+
+  10+ Bulk Xmit        Transmit a 1 or more files to other centers
+
+      Allow the Softcopy administrator to transmit one or more data sets
+      to the other softcopy centers using MVS/BDT.
+
+  11+ Xmit File        Transmit a single file to other centers
+
+      Allow the Softcopy administrator to transmit a single file
+      to the other softcopy centers using MVS/BDT.
+
+  12+ Collect          Collect a file of all softcopy files
+
+      Collect a file of all softcopy for use in the os/2 command
+      procedure to identify new and/or revised softcopy publications.
+
+
+>>>Book Upload Instructions.
+
+  All softcopy elements must be uploaded using the following defaults:
+
+  File    Data     DCB                  Dsname
+  Type    Type     Recfm Lrecl Blksize  Format
+  ---------------------------------------------------------------
+  Shelf   Text     VB    256   6233     ABOOK.UPLOAD.name.BKSHELF
+  Book    Binary   FB   4096   8192     ABOOK.name.BOOK
+  Index   Binary   FB   4096   8192     ABOOK.name.BKINDEX
+
+  Using TCP/IP FTP:
+  ftp mvs-host-name
+  ..enter your userid when prompted
+  ..enter your password when prompted
+  >cd 'abook'
+  >nmap $1.$2 UPLOAD.$1.BKSHELF
+  >mput *.bks
+  >nmap $1.$2 $1.BOOK
+  >binary
+  >site recfm=fb,lrecl=4096,blksize=8192 pri=300 sec=300 tr
+  >mput *.boo
+  >nmap $1.$2 $1.BKINDEX
+  >mput *.bki
+  >quit
+
+  Here is a sample OS/2 command file that can be used to start the
+  ftp upload processes for multiple nodes:
+
+   del w1
+   del s1
+   del s2
+   start "wcc1" ftp wcc1a.rockwell.com < ftpupld.txt > w1
+   start "swc1" ftp swc1.rockwell.com < ftpupld2.txt > s1
+   start "swc2" ftp swc2.rockwell.com < ftpupld2.txt > s2
+
+  Note that some Books and Book Indexes may exceed the default file
+  allocation size.  In this case it is easier to preallocate the data
+  set using ISPF and then the upload will use that allocation.
+
+>>>Local Dependencies
+
+   SOFTDFT sets local defaults
+
+   SHOWTSO is a local TSO command that returns information into rexx
+           and clist variables from various system and local control
+           blocks.  This is not included with this file as it is very
+           much a Rockwell unique implementation.
+           It is used to identify the current NJE node and to identify
+           the users department/group (from the ACF2 Logonid record).
+           You should be able to do these things with your own rexx
+           code.  ** currently not used **
+
+   SOFTPBC Exec submits a batch job to delete obsolete ISPF tables
+           and uses a local job card structure and the PDSTOOLS PDS
+           command.
+
+>>>Dialog Elements
+
+ISPF Commands:      The following commands must be added to the
+                    ISPCMDS command table by the ISPF administrator:
+
+                    Verb      T  Action
+                                    Description
+               '''' BOOKADM   5  SELECT CMD(%SOFTPUBA) NEWAPPL(EOXR)
+                                    Softcopy Administration Dialog
+               '''' BOOKMAN   5  SELECT CMD(%SOFTPUB &ZPARM) NEWAPPL(EOXR)
+                                    Invoke BookManager Read front-end
+
+
+ISPF Panels:        SOFTPUBA   Administration Menu
+                    SOFTPBHA   Tutorial panel for SOFTPUBA
+                    SOFTPBTP   Primary Table Display panel
+                    SOFTPUBD   Display table row information panel
+                    SOFTPBTS   Secondary Table Display panel
+                    SOFTPBWC   COPY 'wait' display panel
+                    SOFTPBWT   BUILD 'wait' display panel
+                    SOFTPUBH   Tutorial panel for SOFTPBTP/S
+                    SOFTPUBX   Table display for REVIEW application
+                    SOFTPBWB   Please wait panel
+                    SOFTPES    Edit/Update a Shelf and then Transmit it
+                    SOFTPTRN   Transmission selection Panel
+                    SOFTPBDT   Transmit a single file Panel
+
+ISPF Messages:      SOFTP00    ISPF Message member
+
+REXX Procedures:
+                    SOFTPUB    End-user Application driver
+                    SOFTPUBA   Administration Application driver
+                    SOFTPBB    BUILD application
+                    SOFTPBC    COPY application
+                    SOFTPBRP   Generate REPORT text for BUILD
+                    SOFTPBDT   Transmit a single file
+                    SOFTPDFT   Set ISPF variables for tables and index
+                    SOFTPUBX   REVIEW application
+                    SOFTPUSG   Generate a USAGE report for the application
+                    SOFTPBKL   Create a member of all new books (used by puba)
+                    SOFTPES    Edit a shelf and then transmit it
+                    SOFTPLST   Create a list from a table
+                    SOFTPTRN   Selection list of files for transmission
+                    SOFTPBFX   Called by Update to correct a shelf
+                    SOFTPUSD   Creates reports of used/unused files

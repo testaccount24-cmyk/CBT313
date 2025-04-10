@@ -1,0 +1,12 @@
+        /* Rexx exec to establish defaults for tso mail processing */
+
+        /* ------------------------------------------------------- */
+        /*                                                         */
+        /*      Build the information to identify the sender       */
+        /*      for messages that are to be sent:                  */
+        /*                                                         */
+        /* ------------------------------------------------------- */
+        Address ISPEXEC "DISPLAY PANEL(TMAILDEF)"
+
+        Address ISPEXEC "DISPLAY PANEL(TMAILSUF)"
+        exit

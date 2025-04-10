@@ -1,0 +1,44 @@
+)ATTR DEFAULT(%+_)
+/* --------------------------------- */
+/* Panel courtesy of Philippe Lognot */
+/* --------------------------------- */
+ _ TYPE(INPUT) JUST(ASIS) hilite(uscore)
+ @ TYPE(TEXT) COLOR(TURQ) INTENS(LOW)
+ $ TYPE(Output) INTENS(High)
+)BODY EXPAND(!!)
+%!-! TexT-to-CSV $ver  !-!%
+%Command ===>_Zcmd
++
+%Input DSN  :_Zin                                         +
+@Dataset or PDS(member)                      -> Ex.:%&ZUSER..TABLE
+
+%Output DSN :_Zout                                        +
+@Dataset : will be created (must not exist)  -> Ex.:%&ZUSER..TABLE.CSV
+%CSV Character: _z+    @May be any character - default is ,
+
+%Position of columns :_Zc
+@Preceded by "-" to ignore column
+@Example :%1 11 -21 31 -41
+
+%&ZUSER..TABLE
+@ ----+----1----+----2----+----3----+----4
+  01234567  abcdefgh  ijklmnop  qrstuvwx
+  0123      abcd      ij  mn    qr  uv
+%&ZUSER..TABLE.CSV
+@ 01234567,abcdefgh,qrstuvwx,
+  0123,abcd,"qr  uv",
+
+%Note:@If a column contains spaces, quotation marks are added
+)INIT
+  .cursor = Zin
+  .zvars = '(zchar)'
+  .help = txt2csvh
+)PROC
+  VER(&ZIN,DSNAME)
+  VER(&ZOUT,DSNAME)
+  IF (&ZCHAR NE &Z)
+      &ZC2 = '/CSV "&ZCHAR"'
+  IF (&ZCHAR EQ &Z)
+      &ZC2 = &Z
+  &ZSEL = 'CMD(%TXT2CSV &ZIN &ZOUT &ZC &ZC2)'
+)END

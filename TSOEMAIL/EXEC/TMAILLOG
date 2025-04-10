@@ -1,0 +1,345 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      TMAILLOG                                           *
+         *                                                               *
+         * Function:  Display TSO/E Mail Log Data Sets                   *
+         *            Create  TSO/E Mail Log Data Sets                   *
+         *                                                               *
+         * Syntax:    %TMAILLOG options                                  *
+         *                                                               *
+         * options:   DEBUG      Provide REXX instruction tracing        *
+         *            LOG n      Return information on log data set 'n'  *
+         *                                                               *
+         * Logic:                                                        *
+         *                                                               *
+         *  1.  Process initialization options                           *
+         *  2.  Determine if started under ISPF applid MAIL              *
+         *      and if not then re-invoke under MAIL                     *
+         *  3.  Open log data set and create if necessary                *
+         *  4.  If startup option LOG is specified then                  *
+         *      -  display selection table to return selected information*
+         *      or                                                       *
+         *      -  return information for specified log                  *
+         *      -  then exit                                             *
+         *  5.  Display table of available and defined logs              *
+         *      -  allow display of information on a log                 *
+         *      -  allow delete of a log data set and entry              *
+         *      -  read/process a log                                    *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente Information Technology           *
+         *            25 N. Via Monte Ave.                               *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: lionel.b.dyck@kp.org                     *
+         *                                                               *
+         * History:                                                      *
+         *            05/06/92 - Allow command S row or C row            *
+         *                       Set default Address to ISPEXEC          *
+         *            06/28/91 - cleanup                                 *
+         *            06/20/91 - Creation by Lionel Dyck                 *
+         * ------------------------------------------------------------- */
+
+        Arg options
+
+        if wordpos("DEBUG",options) > 0 then trace i
+
+        if "ACTIVE" = sysvar(sysispf) then do
+           Address ISPEXEC
+           "VGET ZAPPLID"
+           if zapplid ¬= "MAIL" then do
+           cmd = sysvar(sysicmd)
+           "SELECT CMD(%"cmd options") NEWAPPL(MAIL)"
+           exit 0
+           end
+
+        parse value options with "LOG" log_number .
+
+        if wordpos("LOG",options) > 0 then log_process = "on"
+                                      else log_process = "off"
+
+        prefix = sysvar(syspref)
+        table_log = "'"prefix".TSOMAIL.TABLE'"
+        "CONTROL ERRORS RETURN"
+
+        crp = 0
+        rowcrp = 0
+        hcc = 0
+
+        "LIBDEF TSOMLOG DATASET ID("table_log")"
+
+        open_it:
+        "TBOPEN TSOMLOG LIBRARY(TSOMLOG) WRITE"
+        lrc = rc
+
+        select
+            when lrc = 8 then do
+                 "TBCREATE TSOMLOG KEYS(lognum)",
+                 "NAMES(Logdesc Logds) LIBRARY(TSOMLOG) WRITE"
+                 parse value "" with logdesc logds
+                 lognum = 1
+                 "TBADD TSOMLOG"
+                 "TBDELETE TSOMLOG"
+                 "TBSORT TSOMLOG FIELDS (LOGNUM N,A)"
+                 "TBSAVE TSOMLOG LIBRARY(TSOMLOG) REPLCOPY"
+                 end
+            when lrc = 12 then do
+                 if retry_open = 1 then do
+                    maillmsg = "TSO/E Mail Log error code" lrc
+                    "Setmsg Msg(MAIL000)"
+                    exit 4
+                    end
+                    else do
+                         retry_open = 1
+                         "TBEND TSOMLOG"
+                         signal open_it
+                         end
+                    end
+            when lrc > 12 then do
+                 mailsmsg = "Error"
+                 maillmsg = "TSO/E Mail Log error code" lrc
+                 "Setmsg Msg(MAIL000)"
+                 exit 4
+                 end
+            otherwise nop;
+            end
+
+        if length(log_number) > 0 then do
+           lognum = log_number
+           "TBSCAN TSOMLOG ARGLIST(lognum)"
+           if rc = 0 then do
+              "VPUT (logds lognum)"
+              "TBEND TSOMLOG"
+              "LIBDEF TSOMLOG"
+              exit 0
+              end
+          else do
+              mailsmsg = ""
+              maillmsg = "The selected log data set" log_number,
+                          "does not exist - try again"
+              "SETMSG MSG(Mail000)"
+              end
+           end
+
+        if log_process = "off" then log_panel = "TMLOG1"
+                               else log_panel = "TMLOG2"
+
+        display:
+        do forever
+           parse value "" with zcmd zsel mailsmsg maillmsg
+
+        if hcc == 4 then "TBDISPL TSOMAIL"
+           else do
+                "TBTOP TSOMLOG"
+                "TBSKIP TSOMLOG NUMBER("crp")"
+                if rowcrp = 0 then
+                "TBDISPL TSOMLOG PANEL("log_panel")"
+                else
+                "TBDISPL TSOMLOG PANEL("log_panel")",
+                        "CSRROW("rowcrp") AUTOSEL(NO)"
+                end
+
+        crp = ztdtop
+
+        hcc = rc  /* save return code */
+
+        if hcc > 4 then do
+             "TBCLOSE TSOMLOG REPLCOPY LIBRARY(TSOMLOG)"
+             "LIBDEF TSOMLOG"
+             mailsmsg = 'Complete'
+             maillmsg = 'ISPF TSO Mail Log Process Complete'
+             "SETMSG MSG(MAIL000)"
+             exit
+             end
+
+        if ztdsels = 0 & length(zcmd) = 0 then signal display
+
+        hit = 0
+        rowcrp = 0
+
+        if zsel ¬= ""  then do
+           "TBQUERY TSOMLOG",
+                  "POSITION(ROWCRP)"
+                  crp = crp + rowcrp - 1
+                  rowcrp = 1
+                  end
+
+        upper zcmd
+
+        sel_opt:
+        if words(zcmd) > 1 then do
+           parse value zcmd with v1 row
+           if datatype(row) <> "NUM" then do
+              mailsmsg = "Error"
+              maillmsg = "Invalid command:" zcmd
+              "Setmsg MSG(MAIL000)"
+              signal display
+              end
+           if wordpos(v1,"C S") = 0 then do
+              mailsmsg = "Error"
+              maillmsg = "Invalid command:" zcmd
+              "Setmsg MSG(MAIL000)"
+              signal display
+              end
+           else do
+                lognum = row
+                "TBTOP TSOMLOG"
+                "TBSCAN TSOMLOG ARGLIST(lognum)"
+                if rc > 0 then do
+                   mailsmsg = "Not Found"
+                   maillmsg = "Desired row not found for command:",
+                               zcmd
+                   msg = 1
+                   end
+                else do
+                   zsel = v1
+                   end
+                end
+           end
+
+        if zcmd = "NEW" then do
+        new_log:
+           "TBBOTTOM TSOMLOG"
+           if rc = 8 then lognum = 1
+                     else lognum = lognum + 1
+           parse value "" with logds logdesc
+           "Display Panel(TMLOG3)"
+           if rc > 0 then do
+              mailsmsg = "Cancelled"
+              maillmsg = "Creation of TSO/E Mail Log has been cancelled"
+              "Setmsg MSG(MAIL000)"
+              signal display
+              end
+           if left(logds,1) <> "'" then logds ="'"prefix"."logds"'"
+           if sysdsn(logds) = "OK" then do
+              mailsmsg = "Error"
+              maillmsg = "Specified TSO/E Mail Log data set current exists",
+                         " - try again"
+              "Setmsg MSG(MAIL000)"
+              signal new_log
+              end
+           Address TSO
+           "Alloc ds("logds") NEW Like("table_log")"
+           "Free  ds("logds")"
+           Address ISPEXEC
+           mailsmsg = "Created"
+           maillmsg = "TSO/E Mail Log data set" logds "has been allocated."
+           "TBADD TSOMLOG"
+                 "TBSAVE TSOMLOG LIBRARY(TSOMLOG) REPLCOPY"
+           "LIBDEF TM"lognum "DATASET ID("logds")"
+           "TBCREATE TM"lognum "KEYS(MAILNUM)",
+           "NAMES(MAILFLOC MAILFID MAILTLOC MAILTID MAILDATN MAILDATD",
+           "MAILTIME MAILACTN MAILSUBJ MAILFDS MAILTDS)",
+           "LIBRARY(TM"lognum") WRITE"
+               "TBSAVE TM"lognum "LIBRARY(TM"lognum") REPLCOPY"
+               "TBEND  TM"lognum
+               "LIBDEF TM"lognum
+           msg = 1
+        end
+
+        if abbrev("RENUMBER",zcmd,3) = 1 then do
+             "LMINIT DATAID(dataid) DATASET("table_log") ENQ(SHRW)"
+             "LMOPEN DATAID("dataid") OPTION(OUTPUT)"
+             "LMMDEL DATAID("dataid") MEMBER(TSOMLOGX)"
+             "LMCLOSE DATAID("dataid")"
+             "LMFREE DATAID("dataid")"
+           "TBCREATE TSOMLOGX KEYS(lognum)",
+                 "NAMES(Logdesc Logds) LIBRARY(TSOMLOG) WRITE"
+           "TBTOP TSOMLOG"
+              log_count = 0
+              "TBQUERY TSOMLOG ROWNUM("rows")"
+           loop_num: do rows
+             "TBSKIP TSOMLOG"
+             if rc = 0 then do
+               log_count = log_count + 1
+               if lognum <> log_count then do
+                 "LMINIT DATAID(dataid) DATASET("logds") ENQ(SHRW)"
+                 "LMOPEN DATAID("dataid") OPTION(OUTPUT)"
+                 "LMMREN DATAID("dataid") MEMBER(TM"lognum")",
+                     "NEWNAME(TM"log_count")"
+                 "LMCLOSE DATAID("dataid")"
+                 "LMFREE DATAID("dataid")"
+                 lognum = log_count
+                 end
+               "TBADD TSOMLOGX"
+               end
+             end
+           "TBSORT TSOMLOGX FIELDS (LOGNUM N,A)"
+           "TBSAVE TSOMLOGX LIBRARY(TSOMLOG) REPLCOPY"
+           "TBEND TSOMLOGX"
+           "TBEND TSOMLOG"
+           "LIBDEF TSOMLOG"
+             "LMINIT DATAID(dataid) DATASET("table_log") ENQ(SHRW)"
+             "LMOPEN DATAID("dataid") OPTION(OUTPUT)"
+             "LMMDEL DATAID("dataid") MEMBER(TSOMLOG)"
+             "LMMREN DATAID("dataid") MEMBER(TSOMLOGX)",
+                 "NEWNAME(TSOMLOG)"
+             "LMCLOSE DATAID("dataid")"
+             "LMFREE DATAID("dataid")"
+           "LIBDEF TSOMLOG DATASET ID("table_log")"
+           "TBOPEN TSOMLOG LIBRARY(TSOMLOG) WRITE"
+           "TBTOP  TSOMLOG"
+           mailsmsg = "Updated"
+           maillmsg = "TSO/E Mail Log information has been updated."
+           "SETMSG MSG(Mail000)"
+           signal display
+           end
+
+        do_sel:
+        if log_process = "on" then do
+           Select
+             When zsel = "I" then do
+                  "DISPLAY PANEL(TMLOGI)"
+                  end
+             When zsel = "C" then do
+                  "DISPLAY PANEL(TMLOGC)"
+                  if rc = 0 then call update_log
+                  end
+             When zsel = "S" then do
+                  "VPUT (logds lognum)"
+                  "TBEND TSOMLOG"
+                  "LIBDEF TSOMLOG"
+                  exit 0
+                  end
+             otherwise nop;
+             end
+        end
+
+        if log_process = "off" then do
+           Select
+             When zsel = "D" then do
+                  mailsmsg = "Deleted"
+                  maillmsg = "Log entry deleted........"
+                  msg = 1
+                  Address TSO "Delete" logds
+                  "TBDELETE TSOMLOG"
+                  "TBSAVE TSOMLOG LIBRARY(TSOMLOG) REPLCOPY"
+                  end
+             When zsel = "I" then do
+                  "DISPLAY PANEL(TMLOGI)"
+                  end
+             When zsel = "C" then do
+                  "DISPLAY PANEL(TMLOGC)"
+                  if rc = 0 then call update_log
+                  end
+             When zsel = "S" then do
+                  table = logds
+                  tablet = strip(logds,,"'")
+                  ispftbl = "TM"lognum
+                  maillog = logdesc
+                  "VPUT (table tablet ispftbl maillog) SHARED"
+                  "Select CMD(%TSOMAIL LOG)"
+                  end
+             otherwise nop;
+             end
+        end
+
+        if msg = 1 then "SETMSG MSG(Mail000)"
+        end
+
+        update_log:
+           "TBMOD TSOMLOG"
+           "TBSAVE TSOMLOG LIBRARY(TSOMLOG) REPLCOPY"
+           mailsmsg = "Updated"
+           maillmsg = "TSO/E Mail Log information has been updated."
+           "SETMSG MSG(Mail000)"
+           return

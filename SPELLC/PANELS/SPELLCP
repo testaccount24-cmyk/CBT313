@@ -1,0 +1,22 @@
+)Attr Default(%+_)
+/* + type(text  ) intens(low )                   information only  */
+   _ type( input) intens(high) caps(off) just(left )
+   ` type(output) intens(high)  caps(off) just(left ) color(yellow)
+     just(right)
+   $ type(output) intens(high)  caps(off) just(left ) color(yellow)
+   % type(text) intens(high)
+   ~ type(text) intens(high) color(blue) hilite(reverse)
+  @ type(output) color(blue) just(left) caps(off) color(turq)
+)Body Window(60,10) Expand(\\)
+%-\-\- ~ISPF Edit Spelling Checker+@ver% -\-\-
++Processing word:$word
++
++Errors so far:         `errors  +
++Unique words in error: `invalidw+
++Total words processed: `total   +
++Input record count:    `l       +to`stop    +
++Personal Dictionary:   `private +
++Public Dictionary:     `public  +
++Elapsed time:       `et         +
+)Proc
+)End

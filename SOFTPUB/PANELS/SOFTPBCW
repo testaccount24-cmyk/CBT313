@@ -1,0 +1,26 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type( input) intens(high) caps(on ) just(left ) pad('_')
+   ¬ type(output) intens(high) caps(off) just(left ) color(white)
+   | type(text) intens(low ) caps(off) just(asis ) color(white)
+   ` type(output) intens(high) caps(off) just(asis) color(white)
+)Body
++--------------% Softcopy Publications Softcopy Collect Process +---------------
+%
+%
+%
+%                              Please be Patient
+%
+%
+%    Collect is currently in the process of ................
+%
+%
+%    `colmsg
+%
+%
+%
+)Init
+)Proc
+)End

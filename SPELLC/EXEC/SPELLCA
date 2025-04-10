@@ -1,0 +1,292 @@
+        /* rexx                                                       *
+         *                                                            *
+         * this program adds a word the user dictionary as defined    *
+         * by the rexx program 'spellc'.                              *
+         *                                                            *
+         * --- to use ---                                             *
+         * you type 'spellca' on the command line, then place the     *
+         * cursor on the word you want to add and then press enter.   *
+         * it will then add the word to the user dictionary.          *
+         *                                                            *
+         * modified by lionel dyck 08/13/2004 to:                     *
+         *   - typo correction (minor)                                *
+         *                                                            *
+         * modified by lionel dyck 05/14/2004 to:                     *
+         *   - reflow to less than column 73                          *
+         *                                                            *
+         * modified by lionel dyck 05/07/2004 to:                     *
+         *   - check for comment lines and ignore                     *
+         *   - check for no word                                      *
+         *   - translate out the from and nls_from from the selected  *
+         *     word                                                   *
+         *                                                            *
+         * modified by hartmut beckman 05/05/2004 to:                 *
+         *   - more nls support code                                  *
+         *                                                            *
+         * modified by hartmut beckman 05/04/2004 to:                 *
+         *   - revise parse of spellcdf variables for future nls      *
+         *     support                                                *
+         *                                                            *
+         * modified by lionel dyck 05/04/2004 to:                     *
+         *   - change cursor test location from <2 to <1 to allow     *
+         *     placement on line 1 of the text                        *
+         *   - add new words on the existing line if line             *
+         *     length < 80                                            *
+         *   - if user dictionary dsn there but the data set has      *
+         *     been deleted then reallocate it                        *
+         *                                                            *
+         * modified by lionel dyck 05/03/2004 to:                     *
+         *   - if no user dictionary defined and the spellcdf         *
+         *     defaults has provided a model then create one and      *
+         *     save the name in the ispf profile for future use.      *
+         *   - Test so we don't add a word multiple times             *
+         *   - improve no dictionary message                          *
+         *   - add initial value for startword                        *
+         *     - thx to hartmut beckmann                              *
+         *   - remove special chars from end of word (.?!'")          *
+         *                                                            *
+         * modified by lionel dyck 04/30/2004 to:                     *
+         *   - issue ispf message if successful                       *
+         *   - issue ispf message if no dictionary                    *
+         *   - change from writing disp=mod to                        *
+         *     reading/adding/writing as disp=mod does not work if    *
+         *     the dictionary is a pds member                         *
+         *                                                            *
+         * written by russell nesbitt 04/29/2004                      *
+         ************************************************************ */
+         signal on novalue name sub_novalue
+
+        /* ----------- *
+         * Macro setup *
+         * ----------- */
+         Address ISRedit
+         "MACRO (parms) NOPROCESS"
+
+        /* ---------------------------- *
+         * Get line and cursor location *
+         * ---------------------------- */
+         "(curline, curcol) = cursor"
+         "(linum) = linenum .zcsr"
+
+        /* -------------------------------- *
+         * Verify the cursor is in the text *
+         * -------------------------------- */
+         if curcol = 0 then do
+             zedsmsg = "Error"
+             zedlmsg = "The cursor is not within your text near a" ,
+                       "word. Place the cursor on a word and try again."
+             Address ISPExec
+             "Setmsg msg(isrz001)"
+             exit
+             end
+         if linum < 1 then do
+             zedsmsg = "Error"
+             zedlmsg = "The cursor is not within your text near a." ,
+                       "word. Place the cursor on a word and try again."
+             Address ISPExec
+             "Setmsg msg(isrz001)"
+             exit
+             end
+
+        /* ----------------------------------------- *
+         * Now get the word pointed to by the cursor *
+         * ----------------------------------------- */
+         "(linedata) = line " linum
+         linedata = strip(linedata,'t')
+         startword = 1
+         do i= curcol to 1 by -1 until i < 1
+           if substr(linedata,i,1) = " " then do
+             startword = i + 1
+             leave
+           end
+         end
+         do i= curcol to 80 by 1
+           if substr(linedata,i,1) = " " then do
+             endword = i
+             leave
+           end
+         end
+         wordlen = endword - startword
+         theword = substr(linedata,startword,wordlen)
+         linelen = length(linedata)
+
+        /* ----------------------------- *
+         * Get the SPELLC Local Defaults *
+         * ----------------------------- */
+         spellc_defaults = spellcdf()
+         call parse_defaults
+
+         other = other || '".' || "'"
+
+        /* ---------------------------------------------------- *
+         * Now check for user dictionary and if there isn't one *
+         * and there is a usrmodel then allocate one.           *
+         * ---------------------------------------------------- */
+         address ispexec
+         "vget (usrdict) profile"
+
+         if usrdict <> "" then
+            if "OK" <> sysdsn(usrdict) then
+                call alloc_usrdict
+
+         if usrdict = "" then
+            if usrmodel <> "" then do
+               usrdict = usrmodel
+               "Vput (usrdict) Profile"
+               call alloc_usrdict
+               end
+
+        /* ------------------------------------ *
+         * Verify we have a personal dictionary *
+         * ------------------------------------ */
+         if usrdict = "" then do
+            zedsmsg = "No Dictionary"
+            zedlmsg = "No personal dictionary defined so the word" ,
+                      "could not be added. Please allocate a" ,
+                      "personal dictionary data set (sequential" ,
+                      "with dcb recfm=vb lrecl=84)" ,
+                      "and define it" ,
+                      "when prompted by the SPELLC command dialog" ,
+                      "and then try SPELLCA again."
+            "Setmsg msg(isrz001)"
+            exit 8
+            end
+
+        /* ----------------- *
+         * Clean up the word *
+         * ----------------- */
+         if strip(nls_alpha""nls_alpha_low) /= "" then do
+            theword = translate(theword,nls_alpha,nls_alpha_low)
+            theword = translate(theword,' ',nls_other || nls_from)
+            end
+         else do
+              theword = translate(theword,' ',other || from)
+              end
+         theword = strip(translate(theword))
+
+        /* --------------------------------------- *
+         * Now add word to the personal dictionary *
+         * --------------------------------------- */
+         address tso
+         "Alloc f(dictin) ds("usrdict") shr reuse"
+         "Execio * diskr dictin (finis stem words."
+         hit = 0
+         do i = 1 to words.0
+            if wordpos(theword,words.i) > 0 then hit = 1
+            if hit = 1 then leave
+            end
+         if hit = 1 then do
+              zedsmsg = "Not added"
+              zedlmsg = "Word" theword "was already added."
+            end
+         else do
+              c = words.0
+              if length(words.c) + length(theword) < 80
+                 then do
+                      if left(words.c,1) <> "*"
+                         then words.c = strip(words.c theword)
+                         else do
+                              c = c + 1
+                              words.c = theword
+                              end
+                      end
+              else do
+                   c = c + 1
+                   words.c = theword
+                   end
+              "Execio * diskw dictin (finis stem words."
+              zedsmsg = "Added"
+              zedlmsg = "Word" theword "has been successfully added" ,
+                        "to your personal SPELLC dictionary" usrdict
+              end
+         "free ddname(dictin)"
+         Address ISPExec
+         "Setmsg msg(isrz001)"
+         exit
+
+        /* -------------------------------------------- *
+         * extended parsing of defaults set in SPELLCDF *
+         * by Hartmut Beckmann                          *
+         * -------------------------------------------- */
+         parse_defaults:
+         var.   = ""
+         var.0 = 6
+         email = ""
+         parse value spellc_defaults ,
+                           with var.1 "##" var.2 "##" var.3 "##" ,
+                                var.4 "##" var.5 "##" var.6 "##" .
+         DO i = 1 to var.0
+               parse value var.i with var.i.1 ":" .
+               var.i.1 = TRANSLATE(STRIP(var.i.1))
+               IF var.i.1 = "" THEN ITERATE
+               SELECT
+                 WHEN ( var.i.1 = "DEF") ,
+                   THEN DO
+                           parse value var.i with . ":" ,
+                                       dictdsn   "/" email "/" ,
+                                       usrmodel "/" panelloc .
+                           dictdsn  = STRIP(dictdsn)
+                           email    = STRIP(email)
+                           usrmodel = STRIP(usrmodel)
+                           panelloc = STRIP(panelloc)
+                        END
+                 WHEN ( var.i.1 = "BASE") ,
+                   THEN DO
+                           parse value var.i with . ":" ,
+                                            alpha "/" alpha_low "/" ,
+                                            from "/"  other     .
+                               alpha     = STRIP(alpha)
+                               from      = STRIP(from)
+                               other     = STRIP(other)
+                        END
+                 WHEN ( var.i.1 = "NLS") ,
+                   THEN DO
+                           parse value var.i with . ":" ,
+                                        nls_alpha "/" nls_alpha_low "/",
+                                        nls_from "/" nls_other     .
+                           nls_alpha     = STRIP(nls_alpha)
+                           nls_alpha_low = STRIP(nls_alpha_low)
+                           nls_from      = STRIP(nls_from)
+                           nls_other     = STRIP(nls_other)
+                        END
+                 OTHERWISE ,
+                        DO
+                           IF email /= "" THEN ITERATE
+                           parse value var.i with dictdsn ,
+                                       "/" email "/" usrmodel ,
+                                       "/" panelloc .
+                           dictdsn  = STRIP(dictdsn)
+                           email    = STRIP(email)
+                           usrmodel = STRIP(usrmodel)
+                           panelloc = STRIP(panelloc)
+                        END
+               END
+         END
+         var.   = ""
+         return
+
+        /* ---------------------------- *
+         * Allocate the user dictionary *
+         * ---------------------------- */
+         Alloc_Usrdict:
+         Address TSO
+         "Alloc f(dictin) new spa(1,1) tr" ,
+               "ds("usrmodel") recfm(v b)" ,
+               "lrecl(84) blksize(27990)"
+         words.1 = " "
+         "Execio * diskw dictin (finis stem words."
+         "Free f(dictin)"
+         Address ISPexec
+         return
+
+        /**************************************************************
+        * Trap uninitialized variables                                *
+        ***************************************************************/
+        sub_novalue:
+        Say "Variable" ,
+           condition("Description") "undefined in line" sigl":"
+        Say sourceline(sigl)
+        if sysvar("sysenv") <> "FORE" then exit 8
+        say "Report the error in this application along with the",
+            "syntax used."
+        exit 8

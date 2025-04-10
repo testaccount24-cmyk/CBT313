@@ -1,0 +1,27 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Defaults +-----------------------------
+%Command ===>_zcmd
+%
+
+`    The option to retain 3 mail logs for diagnostic purposes is available if
+`    you or your systems programmer suspect that you may be losing mail
+`    because of some unique situation.  Since the mail table is built from the
+`    mail logs, retaining copies will help with diagnosis.  The logs will be
+`    suffixed HOLD1.LOG, HOLD2.LOG and HOLD3.LOG with a prefix of your userid
+`    and a qualifier as defined by the installation.
+`
+`    The%Print`options are used to provide a fast path for printing of your
+`    messages.  If the printer destination is blank then you will be prompted
+`    by a print option selection menu that will allow you to specify several
+`    different print options and printer types.
+)Init
+)Proc
+)End

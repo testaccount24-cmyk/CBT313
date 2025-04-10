@@ -1,0 +1,82 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   @ type( input) intens(high) caps(on ) just(left ) pad('_')
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ` type(output) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+   ~ type(text) intens(low ) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+   ¬ type(output) intens(high) caps(off) just(asis ) color(turq)
+         hilite(uscore)
+)Body Expand(\\) Width(&ZSCREENW)
+¬maillog+\-\% TSO/E-Mail Processing +\-\
+%Command ===>_zcmd                    \ \                    %Scroll  ===>_mamt+
+%
++Command Options: %Find/SENDmail/SORT                       SHORT/LONG/XLONG
++Line Options:    %S+Read%A+Answer%C+Change%D+Delete%E+Edit%F+Forward%P+Print
++
+%Sel  %FromUser      Date     Time     Subject
++
+)Model
+@z   +!z            !z       !z       !z       \ \
+)Init
+  .HELP = TMLOGHLP
+  .ZVARS = '(ZSEL MAILFID MAILDATD MAILTIME MAILSUBJ)'
+  &mamt = CSR
+  &zsel = &z
+)Proc
+ &zselx = &z
+ IF (&ZCMD = &Z)
+     IF (&ZSEL ¬= &Z)
+       if (&Zsel = '=')
+           &Zsel = &osel
+       &osel = &zsel
+       &ZSEL = TRANS(&ZSEL RE,S.0
+                           REA,S.0
+                           READ,S.0
+                           BR,S.1
+                           BRO,S.1
+                           BROW,S.1
+                           ED,S.2
+                           EDI,S.2
+                           EDIT,S.2
+                           PR,S.3
+                           PRT,S.3
+                           PRNT,S.3
+                           PRIN,S.3
+                           RN,S.4
+                           REN,S.4
+                           RENA,S.4
+                           RENM,S.4
+                           CO,S.5
+                           COP,S.5
+                           CPY,S.5
+                           COPY,S.5
+                           PDS,S.6
+                           DEL,S.7
+                           PTF,S.8
+                           UNT,S.8
+                           UNTE,S.8
+                           UNTER,S.8
+                           UNTERS,S.8
+                           UNTERSE,S.8
+                           XMIT,S.9
+                           *,*)
+       &ZT = TRUNC(&Zsel,1)
+       &ZT = TRANS(TRUNC(&ZSEL,'.') A,A E,E M,M
+             R,R B,B D,D F,F P,P S,S DM,DM C,C *,X)
+        IF (&ZT = X)
+            &mailsmsg = 'Error'
+            &maillmsg = 'Enter a valid value: A,B,C,D,DM,E,F,M,P,S.  Was &zsel'
+     IF (&ZSEL ¬= &Z)
+       IF (&ZSEL ¬= '=')
+           &OSEL = &ZSEL
+       &ZSEL = TRUNC(&ZSEL,'.')
+       &SUBOPT = .TRAIL
+       VER (&ZSEL,LIST,R,A,B,D,E,F,P,S,DM,M,C,L,MSG=MAIL000)
+       IF (&SUBOPT ¬= &Z)
+          VER (&ZSEL,LIST,S,MSG=MAIL001)
+          VER (&SUBOPT,RANGE,0,9,MSG=MAIL001)
+)End

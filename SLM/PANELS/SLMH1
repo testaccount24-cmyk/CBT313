@@ -1,0 +1,163 @@
+)ATTR
+ ? TYPE(PIN)                         /* panel instruction line       */
+ + TYPE(NT)                          /* normal text attribute        */
+ } TYPE(ET)                          /* emphasized text attribute    */
+ ! type(output) intens(high) caps(off) just(asis )
+ # AREA(SCRL)                        /* scrollable area attribute    */
+ ~ type(text) intens(high) color(blue) hilite(reverse)
+ ` type(text) intens(high) color(blue) hilite(reverse)
+)Body  Expand(//)
+%-/-/- ~Help:`SLM Member List !ver   % -/-/-
++Selection ===>_ZCMD                                                   +
++
+#pnarea                                                                     #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+#                                                                           #
+)AREA pnarea
+}                     -----------------------------------
+                      |   System Library Member List    |
+                      -----------------------------------
+      (to scroll use the right PF key for down and left PF key for up)
++
++  The System Library Member List presents a list of all active library
++  members.  The fields on the panel are:
+
+  %S+      This is the line command entry field.
+  %Name+   This is the member name.  Only the first version of the
+           member will be in the list as it is the active member.
+           Others in libraries lower in the concatenation will not be
+           displayed.
+  %Lib+    This is the concatenation number of the system
+           library in which this member was found.
+
+           The remainder of the columns is the same as for
+           normal browse or edit member lists.
++
+ %Command Processing options:
++
+  %ACTive+will restore the display to normal after using the%All+
+  command.
++
+  %All+may be used to display all members in all libraries. This
+  will remove the ability to use the NEW command and the Edit option.
++
+  %Browse+may be used to edit the specified member. The syntax
+
+  e.g%B IEASYS00+or%S IEASYS00+
++
+  %Dup+will display on duplicate members. The syntax
+
+  e.g%dup+
++
+  %Edit+may be used to edit the specified member. The syntax
+
+  e.g%E IEASYS00+
++
+  %Filter+may be used to limit the members being displayed. The syntax
+  is %Filter member+ where the member name may be a full member name
+  or a partial name ending in *.
+
+  e.g%FILTER IEASYS*+is the same as%FILTER IEASYS+
++
+  %Locate+may be used to find a member.  The syntax is%L member+ where
+  member may be a full member name, a partial member name or a member
+  name ending in *.
+
+  e.g%L IEASYS*+is the same as%L IEASYS+
++
+  %New+may be used to create a new member in the Save-To library or if
+  no library is so designated then the member will be created in the
+  top (number 1) library.
+
+  e.g%New member
+  where member is the name of the new member to be created.
++
+  %REFresh+will refresh the display.
++
+  %REPort+will display the currently active configuration settings.
++
+  %SELECT+is the same as BroWse.
++
+  %SORT+may be used to alter the order of the members displayed.  Any
+  field of the display may be sorted.  The syntax is:
+
+  %SORT field+
+  or
+  %SORT field,order+
+  or
+  %SORT field,order field,order+
+
+  Where order is A for ascending or D for descending (default is A)
++
+ %Line Processing options
++
++Browse, Compare, Delete, Edit, Move, Rename, and View
++
++ Note that Move and Rename only work in the save-to library if
+  defined.
++
+  When using%Browse+and%View+on a member it is opened in the library in
+  which it resides.
++
+  %Compare+will prompt for the target library to compare with.
++
+  When using%Edit+on a member, the location of the edit is determined
+  by the library designated as the Save-To library.
++
+  When the Save-To library is the same as the library where the member
+  resides then the process is to:
++
+  %1.+Make a copy of the original member using by changing the suffix of the
+      member as defined when this application was installed.  There are
+      several available options available and the choice for your
+      installation is set in the SLMCUST definitions.
++
+  %2.+Edit the selected member
++
+  When the Save-To library is different from the library where the
+  member resides then the process is to:
++
+  %1.+Copy the member into the Save-To library
++
+  %2.+Edit the selected member
++
+  %3.+If the member is not saved (the edit is cancelled) then the
+      copied member is deleted.
++
+)PROC
+)END
+/*  Copyright (C) 2002, Lionel B. Dyck
+/*
+/*  This program is free software; you can redistribute it
+/*  and/or modify it under the terms of the GNU General Public
+/*  License as published by the Free Software Foundation;
+/*  either version 2 of the License, or (at your option) any
+/*  later version.
+/*
+/*  This program is distributed in the hope that it will be
+/*  useful, but WITHOUT ANY WARRANTY; without even the implied
+/*  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+/*  PURPOSE.  See the GNU General Public License for more
+/*  details.
+/*
+/*  You should have received a copy of the GNU General Public
+/*  License along with this program; if not, write to the Free
+/*  Software Foundation, Inc., 59 Temple Place - Suite 330,
+/*  Boston, MA  02111-1307,

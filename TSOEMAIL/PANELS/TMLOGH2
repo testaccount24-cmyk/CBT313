@@ -1,0 +1,33 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++-------------------------% TSO/E-Mail LOG Tutorial +---------------------------
+%Command ===>_zcmd
+%
+%
+`      The following mail log selection commands may be entered on the
+`      selection bar to the left of each message in the TSO/E-Mail LOG Table
+`      display.  Information on them will be presented in sequence or
+`      selected by number.
+
+¦      1 -¬Answer the mail
+¦      2 -¬Delete the note
+¦      3 -¬Forward the note
+¦      4 -¬Print the note
+¦      5 -¬Change the subject and status of a message for clarity
+¦      6 -¬Merge the associated data set into a message
+¦      7 -¬Select the note or process the received File
+          `File options: (Read, Browse, Copy, Delete, Edit, PDS, Print, Rename)
+
+)Init
+)Proc
+  &zsel = trans(&zcmd 1,tmailh2a  2,*tmailh2a  3,tmailh2b
+                      4,*tmailh2b 5,*tmailh2b  6,tmailh2c 7,tmailh2d
+                      *,?)
+)End

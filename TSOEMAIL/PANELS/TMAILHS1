@@ -1,0 +1,20 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(output) intens(low ) caps(off) just(asis ) color(white)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Epilog +-------------------------------
+%Command ===>_zcmd
+%
+
+`    The TSO/E-Mail EPILOG is any comment, up to 10 lines, that you wish to
+`    have included at the end of every message that you send.  This is
+`    optional.
+`
+)Init
+)Proc
+)End

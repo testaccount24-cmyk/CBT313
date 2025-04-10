@@ -1,0 +1,34 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ¦ type(text) intens(high) caps(off) just(asis ) color(turq)
+)Body
++-----------------------% TSO/E SAFE Mail Registration +------------------------
+%Option ===>_zcmd
+
+
++              %A¦- Add your userid for SAFE Mail Processing
++              %D¦- Delete your userid from SAFE Mail Processing
++
++
+¦    SAFE Mail Processing will receive all mail messages and mail
+¦    files for your userid while you are out of the office for more
+¦    than a few days.  This will prevent these from being lost when
+¦    the Job Entry Subsystem SPOOL is cleaned.
+¦
+¦   %A¦- will add your userid for SAFE Mail processing so that your mail
+¦        messages and mail files are received once per day until you return
+¦        to the office.
+¦
+¦   %D¦- will remove your userid from SAFE Mail processing and should be
+¦        requested upon your return.
++
+)Init
+ &userid = trans(&zuser *,*)
+)Proc
+ VER (&ZCMD,NB,LIST,A,D)
+ &opt = trans(&zcmd  A,ADD
+                     D,DELETE)
+)End

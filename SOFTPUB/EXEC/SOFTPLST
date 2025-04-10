@@ -1,0 +1,30 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      Softplst                                           *
+         *                                                               *
+         * Function:  Generate a list of items in a Softcopy Table       *
+         *                                                               *
+         *                                                               *
+         * Syntax:    %softplst library table                            *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *                                                               *
+         * History:   mm/dd/yy                                           *
+         *            comments                                           *
+         *                                                               *
+         * ------------------------------------------------------------- */
+         arg library table user
+
+        Address ISPEXEC
+        "Vput (table user)"
+        "Libdef ISPTLIB Dataset Id("library")"
+        "FTOpen Temp"
+        "FTIncl Softplst"
+        "FTClose"
+        "Libdef ISPTLIB"
+        "Vget ztempf"
+        "Browse Dataset('"ztempf"')"

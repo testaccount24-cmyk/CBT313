@@ -1,0 +1,43 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SoftPDFT                                           *
+         *                                                               *
+         * Function:  Set defaults for softcopy variables for            *
+         *            libraries.                                         *
+         *                                                               *
+         * Syntax:    %softpdft                                          *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (925) 926-5332                                     *
+         *            Internet: LIONEL.B.DYCK@NCAL.kaiperm.org           *
+         *            IBMLINK:  SYSLBD                                   *
+         *                                                               *
+         * History:                                                      *
+         *            03/30/99 - test for sysplex location               *
+         *            08/28/98 - new hlq of MVS.SC for index             *
+         * ------------------------------------------------------------- */
+
+        Center      = sysvar('sysnode')
+
+        select
+          when left(center,2) = "NK" then do
+               build   = "'mvs.SOFTCOPY.TABLE'"
+               Prod    = "'mvs.SOFTPUB.TABLE'"
+               Index   = "MVS.SC"
+               end
+          when left(center,2) = "SK" then do
+               build   = "'pbcsscbk.SOFTCOPY.TABLE'"
+               Prod    = "'pbcsscbk.SOFTPUB.TABLE'"
+               Index   = "pbcsscbk"
+               end
+          otherwise do
+               build   = "'mvs.SOFTCOPY.TABLE'"
+               Prod    = "'mvs.SOFTPUB.TABLE'"
+               Index   = "MVS.SC"
+               end
+          end
+
+        Centers = " "
+        Address ISPEXEC,
+          "VPUT (BUILD PROD INDEX CENTERS) SHARED"

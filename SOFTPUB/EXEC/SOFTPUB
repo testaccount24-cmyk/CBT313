@@ -1,0 +1,618 @@
+        /* ---------------------  rexx procedure  ---------------------- *
+         * Name:      SOFTPUB                                            *
+         *                                                               *
+         * Function:  Book Category Display dialog.                      *
+         *                                                               *
+         *            Then recursively called for each category.         *
+         *                                                               *
+         * Syntax:    %SOFTPUB                                           *
+         *         or                                                    *
+         *            %SOFTPUB title >< table_dsn table_name             *
+         *                    % uaccess                                  *
+         *         or                                                    *
+         *            %SOFTPUB option                                    *
+         *                                                               *
+         * Options:                                                      *
+         *            PRivate     Display users private shelf            *
+         *            OWn         alias of Private                       *
+         *            DEfault     Display the private shelf              *
+         *            BOoks       Display the allbook category           *
+         *            USER        Display only non-access restricted     *
+         *                        categories/shelves/books.              *
+         *            Find xxx    Find the specified string and then     *
+         *                        if only 1 hit open that row, otherwise *
+         *                        display selection                      *
+         *            DFind xxx   Find the specified string and then     *
+         *                        if only 1 hit open that row, otherwise *
+         *                        display selection using the DEFAULT    *
+         *                        category                               *
+         *            DBfind xxx  Find the specified string and then     *
+         *                        if only 1 hit open that row, otherwise *
+         *                        display selection using the ALLBOOK    *
+         *                        category                               *
+         *                                                               *
+         *  Notes on DFind/DBFind:                                       *
+         *                                                               *
+         *        The string will be parsed into multiple strings        *
+         *        and each string must be found for the target to be     *
+         *        selected for display.                                  *
+         *                                                               *
+         * Dependencies: none                                            *
+         *                                                               *
+         * Author:    Lionel B. Dyck                                     *
+         *            Kaiser Permanente                                  *
+         *            Walnut Creek, CA 94598                             *
+         *            (510) 926-5332                                     *
+         *            IBMMail:  USKFHLBD                                 *
+         *            Internet: lionel.b.dyck@ncal.kaiperm.org           *
+         *                                                               *
+         * History:                                                      *
+         *            06/05/00 - Display Shelf if book opened from       *
+         *                       allbook.                                *
+         *            10/24/96 - Fix data beyond col 80                  *
+         *            10/17/96 - Enahnce DFind and DBFIND                *
+         *            07/24/96 - Add RFIND to EOXR commands table        *
+         *            01/24/96 - Minor fix for DB with no search         *
+         *            01/20/96 - Support find for pub number (pubno)     *
+         *            04/20/95 - Support for all books table             *
+         *            01/10/95 - Clear usrrfind properly                 *
+         *            01/04/94 - Add test for PFSHOW value to allow      *
+         *                       user to control PFSHOW action.          *
+         *            12/14/93 - Fix Find with no argument.              *
+         *            09/16/93 - Set initial cursor on cmd line          *
+         *            07/27/93 - Add FIND and DFIND options              *
+         *            07/08/93 - Add Shelf: accounting record            *
+         *            07/07/93 - Add 'accouting' to find who is using    *
+         *                       private shelves.                        *
+         *            05/12/93 - Clean up Find/RFind                     *
+         *            04/26/93 - Don't Call ISPOPF if already ON         *
+         *            04/19/93 - Clean up Find/RFind                     *
+         *            04/02/93 - Fix check_access for default            *
+         *            03/23/93 - Add option of DEFAULT to open Default   *
+         *                       catagory                                *
+         *            03/19/93 - Support Cancel function key (as END)    *
+         *            03/12/93 - Support abbrev private/own  ...         *
+         *                       Fix private shelf support               *
+         *            03/09/93 - Change to log at each center...         *
+         *            03/03/93 - Change showrexx to use showtso          *
+         *            02/24/93 - Add support for local blkshelf (default)*
+         *            02/18/93 - Set Sortbook and Sortshlf options       *
+         *            02/17/93 - test for table dsn exist...             *
+         *            02/11/93 - Set ExitBook and ExitShlf options       *
+         *            02/10/93 - fix access checking                     *
+         *            02/10/93 - add USER option to cause all restricted *
+         *                       shelves to be removed.                  *
+         *            02/09/93 - added center to account                 *
+         *            02/05/93 - added pfk setting (pf11/12/23/24)       *
+         *            02/02/93 - added usage recording                   *
+         *            01/21/93 - created by Lionel Dyck                  *
+         *                                                               *
+         * ------------------------------------------------------------- */
+
+        parse arg options
+
+        Address ISPEXEC "VGET ZAPPLID"
+          if zapplid <> "EOXR" then do
+             Address ISPEXEC "Select",
+                "CMD(%"sysvar('sysicmd') options ") Newappl(EOXR)"
+             Exit 0
+             end
+
+        parse value "" with null uaccess table_dsn table_name opt private,
+                      title find_string dfind_string exit_opt
+
+        if length(options) > 0 then
+           Select
+             when pos("><",options) > 0 then
+                  parse value options with title "><" table_dsn table_name opt
+             when pos("><",options) = 0 then
+                  title = options
+             otherwise nop;
+             end
+
+        if pos("%",opt) > 0 then do
+           parse value opt with . "%" uaccess
+           If abbrev("FIND",translate(word(uaccess,1)),2) = 1 then do
+              parse value uaccess with title "%" uaccess
+              exit_opt = "fast"
+              end
+           end
+
+        If abbrev("DFIND",translate(word(title,1)),2) = 1 then do
+                    dfind_string = "Find" translate(subword(title,2))
+                    private = "default"
+                    exit_opt = "fast"
+                    end
+
+        If abbrev("DBFIND",translate(word(title,1)),2) = 1 then do
+                    if length(subword(title,2)) > 0 then
+                       dfind_string = "Find" translate(subword(title,2))
+                    private = "allbook"
+                    exit_opt = "fast"
+                    end
+
+        If abbrev("FIND",translate(word(title,1)),1) = 1 then do
+                    find_string = translate(subword(title,2))
+                    exit_opt = "fast"
+                    end
+
+        if words(title) = 1 then do
+           titleu = translate(title)
+           Select
+               When titleu = "USER" then uaccess = "xxx"
+               When abbrev("OWN",titleu,2)     = 1 then private = "on"
+               When abbrev("PRIVATE",titleu,2) = 1 then private = "on"
+               When abbrev("DEFAULT",titleu,2) = 1 then private = "default"
+               When abbrev("BOOKS",titleu,2)   = 1 then private = "allbook"
+               otherwise nop;
+               End
+        End
+
+        if length(uaccess) = 0 then do
+        /*   "Showtso fds# dept"
+           uaccess = fds#"/"dept */
+           end
+        uaccess = strip(uaccess)
+
+        "%SOFTPDFT"
+
+        Address ISPEXEC
+
+        "VGET (PROD BUILD)"
+        if length(table_dsn) = 0 then do
+           table_dsn  = prod
+           table_name = "SOFTCOPY"
+           end
+
+        if sysdsn(table_dsn) <> "OK" then do
+           smsg = null
+           lmsg = "This application is not supported on this system."
+           call do_msg
+           exit 0
+           end
+
+        /* --------------------------------------- *
+         * set function key values for our app     *
+         * --------------------------------------- */
+         zpf10 = "Nop"
+         zpf11 = "Retrieve"
+         zpf12 = "Cancel"
+         zpf22 = zpf10
+         zpf23 = zpf11
+         zpf24 = zpf12
+         "Vput (zpf10 zpf11 zpf12 zpf22 zpf23 zpf24)"
+
+        if table_name = "SOFTCOPY" then do
+                 call set_bmread_exitopts
+                 call set_bmread_sortopts
+                 panel = "SOFTPBTP"
+                 title = null
+                "Vget (SOFTPFKS) Profile"
+                 if softpfks <> "OFF" then  "Vget ZPFSHOW"
+                                       else zpfshow = "OFF"
+                 save_pfshow = zpfshow
+                 if softpfks <> "OFF" then
+                   "SELECT PGM(ISPOPF) PARM(PFK,ON) NOFUNC SUSPEND"
+                 end
+           else do
+                panel = "SOFTPBTS"
+                title = center(title,75)
+                end
+
+        "Control Errors Return"
+        "Libdef SOFTPUB Dataset ID("table_dsn")"
+
+        "TBOpen" table_name "Library(SOFTPUB) Nowrite Share"
+
+        if table_name = "SOFTCOPY" then call check_default
+        if private <> "default" then
+           if private <> "allbook" then
+              if private_count = 0 then
+                 private = null
+        call check_access
+
+        "TBQuery" table_name "ROWNUM(Tabrows)"
+        Select
+        when tabrows = 1 then do
+           "TBTOP" table_name
+           "TBSKIP" table_name "NUMBER(1)"
+           call read_it
+           signal out_a_here
+           end
+        when tabrows = 0 then do
+           smsg = Find_string "not found"
+           lmsg = find_string "was not found in the search"
+           call do_msg
+           signal out_a_here
+           end
+        otherwise if tabrows > 1 then exit_opt = null
+        end
+
+        parse value '1 0 0 0' with crp rowcrp last_find prev_crp o1 o2
+
+        User_Display:
+        do forever
+
+        usrrfind = "PASSTHRU"
+        "VPUT USRRFIND"
+        "TBTop EOXRCMDS"                     /* 7-24-96 */
+        ZCTVERB   = "RFIND"                  /* 7-24-96 */
+        "TBSCAN EOXRCMDS ARGLIST(ZCTVERB)"   /* 7-24-96 */
+        if rc >0 then do                     /* 7-24-96 */
+           "TBTop EOXRCMDS"                  /* 7-24-96 */
+           ZCTTRUNC  = "0"                      /* 7-24-96 */
+           ZCTACT    = "&USRRFIND"              /* 7-24-96 */
+           ZCTDESC   = "Repeat Find Command"    /* 7-24-96 */
+           "TBAdd EOXRCMDS"                     /* 7-24-96 */
+           end
+
+        Select
+          when private = "default" then do
+                  "TBTOP" table_name
+                  "TBSKIP" table_name "NUMBER("default_row")"
+                  call read_it
+                 private = null
+                 end
+          when private = "allbook" then do
+                  "TBTOP" table_name
+                  "TBSKIP" table_name "NUMBER("allbook_row")"
+                  call read_it
+                 private = null
+                 end
+          when private = "on" then do
+             if private_count > 1 then leave
+                 "Control Display Save"
+                  Usrrfind = null
+                  "VPUT USRRFIND"
+                  "TBTOP" table_name
+                  "TBSKIP" table_name "NUMBER(1)"
+                 "Select CMD(%Bookmgr Shelf('"data"') )"
+                 private = null
+                 "Control Display Restore"
+             end
+          Otherwise nop;
+        end
+
+        zcmd = null
+
+        if src = 4 then "TBDispl" table_name
+           else do
+                "TBTOP" table_name
+                "TBSKIP" table_name "NUMBER("crp")"
+                if rowcrp = 0 then
+                   "TBDISPL" table_name "PANEL("panel")"
+                   else
+                   "TBDISPL" table_name "PANEL("panel")",
+                           "CSRROW("rowcrp") AUTOSEL(NO)"
+                end
+        src = rc
+
+        Usrrfind = null
+        "VPUT USRRFIND"
+
+        if src > 4 then signal out_a_here
+
+        skip_disp:
+          crp = ztdtop
+          rowcrp = null
+
+        if row <> null then
+           if row > 0 then do
+             "TBTop" table_name
+             "TBSkip" table_name "NUMBER("row")"
+             end
+
+        zcmd_ok = null
+
+        Select
+          when wordpos(zcmd,'CANCEL Cancel') > 0 then signal out_a_here
+          When words(Zcmd) > 1 then do
+               parse value zcmd with o1 o2
+               if abbrev("FIND",o1,1) = 1 then call Find_It
+               if zcmd_ok <> "ok" then do
+                  smsg = "Error"
+                  lmsg = "Invalid command:" zcmd
+                  call do_msg
+                  end
+               end
+          When zcmd = "RFIND" then do
+               zcmd = "RFIND" o2
+               call Find_It
+               end
+          When length(zcmd) = 0 then
+             if row <> 0 then
+                          if zsel <> null then call Read_it
+          otherwise nop
+        end
+
+        signal User_Display
+        end
+
+        /* ------------------------------------------------------------- *
+         * Find_it routine to search the table 'desc'  entries for the   *
+         * specified character string.  The search is done using         *
+         * REXX instead of using the ISPF TBSCAN which is very limited.  *
+         * ------------------------------------------------------------- */
+        Find_It:
+           zcmd_ok = "ok"
+           parse value zcmd with o1 argument
+           if length(argument) = 0 then do
+              smsg = "No Argument"
+              lmsg = "No search argument was provided"
+                 call do_msgn
+                 return
+                 end
+           search_argument = argument
+           upper argument
+           argument = strip(argument)
+           zsel = null
+           crp = ztdtop
+           start_crp = crp
+           rowid = crp
+           find_loop = null
+           search = null
+          "TBTOP" table_name
+           if o1 = "RFIND" then do
+              if prev_crp <> start_crp then last_find = start_crp
+              last_find = last_find + 1
+              "TBSKIP" table_name "Position(ROWID) Number("Last_find")"
+              end
+              else do
+                   "TBSKIP" table_name "Position(ROWID) Number("start_crp")"
+                   end
+           if rc = 8 then do
+                          s_smsg = search_argument "Found - Table Wrapped"
+                          "TBTOP" table_name
+                          "TBSKIP" table_name "Position(ROWID)"
+                          end
+                     else s_smsg = search_argument "Found"
+
+           /* perform search */
+
+           do forever
+              search = translate(desc) translate(pubno)
+              if pos(argument,search) > 0 then do
+                 crp = rowid + 0
+                 rowcrp = crp
+                 last_find = crp
+                 smsg = s_smsg  /* "Found" */
+                 lmsg = search_argument "found during search in row:" crp
+                 call do_msgn
+                 prev_crp = start_crp
+                 return
+                 end
+              "TBSKIP" table_name "POSITION(Rowid)"
+              if rc = 8 then do
+                    "TBTOP" table_name
+                     s_smsg = search_argument "Found - Table Wrapped"
+                 if find_loop = "on" then do
+                     smsg = search_argument "Not Found"
+                     lmsg = search_argument "Not found during search"
+                     rowid = crp
+                     call do_msg
+                     prev_crp = start_crp
+                     return
+                     end
+                     else find_loop = "on"
+                 end
+              zsel = null
+              end
+        return
+
+        /* ------------------------------------------------------------- *
+         * Do_msg routines is used to issue the ISPF Message....         *
+         * ------------------------------------------------------------- */
+        Do_Msg:
+           "Setmsg Msg(SOFTP000)"
+        return
+
+        Do_MsgN:
+           "Setmsg Msg(SOFTP001)"
+        return
+
+        /* ------------------------------------------------------------- *
+         * Read_it routine to:                                           *
+         *                                                               *
+         * 1.  Display another category selection using %softpub         *
+         * or                                                            *
+         * 2.  Invoke BookManager/Read MVS for the book shelf            *
+         *                                                               *
+         * ------------------------------------------------------------- */
+        Read_it:
+        "Control Display Save"
+
+        if zsel = "V" then do
+              "Display Panel(SOFTPUBD)"
+              "Control Display Restore"
+              return
+              end
+
+        Select
+          When type = "C" then do
+             if length(uaccess) > 0 then xaccess = "%" uaccess
+                                    else xaccess = null
+             if dfind_string <> null then
+                xaccess = "%" dfind_string  xaccess
+             "Select CMD(%SOFTPUB" desc "><" table_dsn data xaccess")"
+             if dfind_string <> null then rc = 4
+             xrc = rc
+             end
+          When type = "B" then do
+               if table_name = "SOFTPALB" then do
+                  zedsmsg = ""
+                  zedlmsg = "Book found in shelf" bshelf
+                  "Setmsg msg(isrz001)"
+                  end
+               "Select CMD(%Bookmgr Book('"data"') )"
+               xrc = rc
+               end
+          When type = "S" then do
+               "Select CMD(%Bookmgr Shelf('"data"') )"
+               xrc = rc
+               end
+          otherwise xrc = 0
+        end
+        "Control Display Restore"
+        if xrc > 0 then do
+           exit_opt = "fast"
+           signal out_a_here
+           end
+        return
+
+        /* ------------------------------------------------------------- *
+         * Check_Access routine:                                         *
+         *                                                               *
+         * If the row is access restricted then check to see if the      *
+         * current user can view it.  If not then remove it from the     *
+         * table.                                                        *
+         *                                                               *
+         * ------------------------------------------------------------- */
+        Check_Access:
+        row_cnt = 0
+        "TBTop" table_name
+        do forever
+           "TBSkip" table_name
+           if rc > 0 then return
+           row_cnt = row_cnt + 1
+           kill = null
+           hit  = null
+           if data = "SOFTPALL" then default_row = row_cnt
+           if data = "SOFTPALB" then allbook_row = row_cnt
+           if find_string <> null then do
+              if pos(word(find_string,1),translate(desc)translate(pubno)) > 0
+                 then do
+                 if words(find_string) > 1 then
+                    do ix = 2 to words(find_string)
+                       if pos(word(find_string,ix), ,
+                              translate(desc)translate(pubno)) = 0
+                          then do
+                          kill = "on"
+                          access = "xx"
+                          end
+                    end
+                 end
+                 else do
+                      kill = "on"
+                      access = 'xx'
+                      end
+              end
+           if length(access) = 0 then iterate
+           if kill = null then
+              do ca = 1 to words(access)
+                 ca_word = word(access,ca)
+                 if pos("*",ca_word) > 0 then
+                    acl = length(ca_word) - 1
+                    else acl = length(ca_word)
+                 ca_word = left(ca_word,acl)
+                 if pos(ca_word,uaccess) > 0 then hit = "on"
+                    else kill = "on"
+              end
+           if hit = "on" then kill = null
+           if kill = "on" then
+                 "TBDelete" table_name
+           end
+        return
+
+        Check_Default:
+        /* ------------------------------------------------------------- *
+         * check_default routine                                         *
+         *                                                               *
+         * look for user defined book shelf list userid.*.bklshelf       *
+         * and then if there add entry for default category (2+ shelves) *
+         * or default shelf.                                             *
+         * ------------------------------------------------------------- */
+         x = outtrap("traplc.","*")
+         Address TSO,
+            "LISTC ENT('"sysvar(syspref)".*.BKLSHELF')"
+         x = outtrap("off")
+         local.  = ""
+         local.0 = 0
+         use_local = 0
+         private_count = local.0
+         do trap = 1 to traplc.0
+            if left(traplc.trap,7) <> "NONVSAM" then iterate
+            parse value traplc.trap with . "-------" filedsn
+            filedsn = strip(filedsn)
+            x       = local.0 + 1
+            local.x = filedsn
+            local.0 = x
+            end
+         if local.0 = 0 then return
+         private_count = local.0
+         do bx = 1 to local.0
+            filedsn = local.bx
+            call read_shelf
+            end
+         return
+
+        Read_Shelf:
+        /* ------------------------------------------------------------- *
+         * Read_Shelf routine                                            *
+         *                                                               *
+         * read the users book shelf and extract the title......         *
+         * ------------------------------------------------------------- */
+        Address TSO
+        "Alloc f("ddn") Shr Reuse DS('"filedsn"')"
+        "Execio * diskr" ddn "(Finis stem t."
+        "Free  f("ddn")"
+        Address ISPEXEC
+        do b = 1 to t.0
+           parse value t.b with a1 a2 bookdsn title
+           title = strip(title)
+            type = "S"
+            desc = "*" title "*"
+            data = bookdsn
+            "TBADD Softcopy Order"
+            use_local = use_local + 1
+           end
+        return
+
+      set_bmread_exitopts:
+      /* ------------------------------------------------------------- *
+       * Set_BMRead_ExitOpts routine:                                  *
+       *                                                               *
+       * If Exitbook is null then set it to                            *
+       *    - do not confirm on book exit                              *
+       *    - do not set bookmark on exit                              *
+       *    (setting is numeric 6 for both)                            *
+       * If Exitshlf is null then set it to                            *
+       *    - do not confirm on exit                                   *
+       *    (setting is numeric 2)                                     *
+       * ------------------------------------------------------------- */
+      "Vget (Exitbook Exitshlf) Profile"
+      if length(exitbook""exitshlf) > 1 then return
+      if exitbook = null then exitbook = 6
+      if exitshlf = null then exitshlf = 2
+      "Vput (Exitbook Exitshlf) Profile"
+
+        set_bmread_sortopts:
+        /* ------------------------------------------------------------- *
+         * Set_BMRead_SortOpts routine:                                  *
+         *                                                               *
+         * If Exitbook is null then set it to                            *
+         *    - do not confirm on book exit                              *
+         *    - do not set bookmark on exit                              *
+         *    (setting is numeric 6 for both)                            *
+         * If Exitshlf is null then set it to                            *
+         *    - do not confirm on exit                                   *
+         *    (setting is numeric 2)                                     *
+         * ------------------------------------------------------------- */
+        "Vget (Sortbook Sortshlf) Profile"
+        if length(sortbook""sortshlf) > 1 then return
+        if sortbook = null then sortbook = 2
+        if sortshlf = null then sortshlf = 2
+        "Vput (Sortbook Sortshlf) Profile"
+        return
+
+        Out_A_Here:
+             "TBEnd" table_name
+             "Libdef SOFTPUB"
+             "Vget ZPFSHOW"
+              softpfks = zpfshow
+             "Vput (softpfks) Profile"
+             if table_name = "SOFTCOPY" then do
+                 if save_pfshow = "OFF" then
+                   "SELECT PGM(ISPOPF) PARM(PFK,OFF) NOFUNC SUSPEND"
+                end
+             if exit_opt = "fast" then exit 4
+             Exit 0

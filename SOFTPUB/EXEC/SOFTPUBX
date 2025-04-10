@@ -1,0 +1,42 @@
+        /* rexx */
+        /* this is the softcopy build review application */
+        arg table
+
+        if table = "" then table = "SOFTCOPY"
+
+        "%SOFTPDFT"
+
+        Address ISPEXEC
+          "Vget (Build)"
+          "Libdef softpub dataset id("build")"
+          "TBOpen" table "Library(softpub)"
+          src = rc
+          if rc > 0 then do
+             Select
+               When src = 8  then lmsg = "Table does not exist"
+               When src = 12 then lmsg = "Table in use, ENQ failed"
+               When src = 16 then lmsg = "Input library not allocated"
+               otherwise lmsg = "Severe table open error"
+               end
+            smsg = ""
+            "SETMSG MSG(Softp000)"
+            exit 4
+            end
+
+        Do forever
+        "TBDispl" table "Panel(softpubx)"
+         if rc > 4 then do
+            "TBEnd" table
+            "Libdef softpub"
+            exit 0
+            end
+        if row <> null then
+           if row > 0 then do
+             "TBTop" table
+             "TBSkip" table "NUMBER("row")"
+             end
+        if zsel <> "" then
+           if type = "C" then do
+           Address ISPEXEC "Select Cmd(%SOFTPUBX" data ")"
+           end
+        end

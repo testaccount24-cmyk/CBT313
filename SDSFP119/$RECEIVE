@@ -1,0 +1,15 @@
+        /* ------------------------rexx----------------------------- *
+         * This code will issue the TSO RECEIVE command for the      *
+         * PANELS and EXEC members of this PDS to rebuild the        *
+         * distribution data sets for this tool.                     *
+         * --------------------------------------------------------- */
+
+        parse source x1 x2 x3 x4 dsn .
+         x = PROMPT("ON") /* enable prompting */
+        queue "dsn(sdsfpage.new.exec)"
+        "Receive inds('"dsn"(exec)')"
+        queue "dsn(sdsfpage.new.panels)"
+        "Receive inds('"dsn"(panels)')"
+        if sysvar('sysispf') <> "ACTIVE" then exit
+        Address ISPEXEC
+           "Browse dataset('"dsn"($doc)')"

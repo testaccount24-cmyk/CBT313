@@ -1,0 +1,186 @@
+        /* --------------------  rexx procedure  -------------------- *
+         * Name:      SLMCUST                                         *
+         *                                                            *
+         * Function:  Set local customization options for the SLM     *
+         *            Dialog                                          *
+         *                                                            *
+         * Syntax:    invoked as a rexx function                      *
+         *                                                            *
+         *            cu = slmcust()                                  *
+         *                                                            *
+         * Author:    Lionel B. Dyck                                  *
+         *            Kaiser Permanente                               *
+         *            Walnut Creek, CA 94598                          *
+         *            (925) 926-5332                                  *
+         *            Internet: lionel.b.dyck@kp.org                  *
+         *                                                            *
+         * History:                                                   *
+         *            12/12/02 - add saveloc option                   *
+         *            12/10/02 - add saveoptu for user libraries      *
+         *                       when slm is called with nosys        *
+         *            12/05/02 - fix for profile noprefix             *
+         *            11/25/02 - change slmpds format                 *
+         *                     - add JES2 Proc name                   *
+         *            11/19/02 - add saveopt 6                        *
+         *            11/08/02 - public release                       *
+         *            10/03/99 - creation                             *
+         * ---------------------------------------------------------- *
+         *  Copyright (C) 2002, Lionel B. Dyck                        *
+         *                                                            *
+         *  This program is free software; you can redistribute it    *
+         *  and/or modify it under the terms of the GNU General Public*
+         *  License as published by the Free Software Foundation;     *
+         *  either version 2 of the License, or (at your option) any  *
+         *  later version.                                            *
+         *                                                            *
+         *  This program is distributed in the hope that it will be   *
+         *  useful, but WITHOUT ANY WARRANTY; without even the implied*
+         *  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR   *
+         *  PURPOSE.  See the GNU General Public License for more     *
+         *  details.                                                  *
+         *                                                            *
+         *  You should have received a copy of the GNU General Public *
+         *  License along with this program; if not, write to the Free*
+         *  Software Foundation, Inc., 59 Temple Place - Suite 330,   *
+         *  Boston, MA  02111-1307,                                   *
+         *                                                            *
+         * ---------------------------------------------------------- */
+
+        parse value "" with null ,
+                       saveopt  savechar1 savechar2 ,
+                       stagesuf stagedsn  permsto j2proc ,
+                       saveoptu saveloc
+
+        /* -------------------------------- *
+         * Define the Name of the JES2 PROC *
+         * -------------------------------- */
+         j2proc = "JES2"
+
+        /* ---------------------------------------------------------- *
+         * Setup saveloc option which controls the character location *
+         * for the backup character.                                  *
+         *                                                            *
+         * Only works with saveopt and saveoptu of 4 and 6 and other  *
+         *                                                            *
+         *     0 - change last character                              *
+         *     1 - if member < 8 characters then add at end           *
+         * ---------------------------------------------------------- */
+         saveloc = 1
+
+        /* ----------------------------------------------------- *
+         * Set local installation options        *custom*        *
+         * ----------------------------------------------------- *
+         * saveopt defines the process of saving the original    *
+         *          member when edited and saved in the same     *
+         *          library.                                     *
+         * values allowed are:                                   *
+         *    1 - reverse the last 2 characters of the member    *
+         *        name                                           *
+         *    2 - change the 2nd to last character to a Z        *
+         *        member name                                    *
+         *    3 - change the last 2 characters to 99 in the      *
+         *        member name                                    *
+         *    4 - save 2 copies of the member - last char to     *
+         *        Z for most recent and Y for previous(oldest)   *
+         *    5 - save 2 copies of the member - next to last char*
+         *        to Z for most recent and Y for previous        *
+         *    6 - save versions 1 to 4 with 1 most recent and    *
+         *        4 being the oldest                             *
+         * default - change the last character to a Z in the     *
+         *        member name                                    *
+         * ----------------------------------------------------- */
+         saveopt = 0
+
+        /* ----------------------------------------------------- *
+         * saveoptu uses the same values as saveopt but is used  *
+         *          when SLM is called using the NOSYS option    *
+         * ----------------------------------------------------- */
+         saveoptu = 6
+
+        /* ----------------------------------------------------- *
+         * savechar1 is the character used for the 'Z'           *
+         * savechar2 is the character used for the 'Y'           *
+         * ----------------------------------------------------- */
+         savechar1 = "Z"
+         savechar2 = "Y"
+
+        /* ----------------------------------------------------- *
+         * Stage Member option (stagesuf)                        *
+         *    null = this option ignored                         *
+         *    not-null then: (e.g. stagesuf = "$"                *
+         *        New member and Edit member are created with    *
+         *        a suffix of stagesuf                           *
+         *        Then must be renamed to production member      *
+         *        name.  If New or Edit for existing stagemem    *
+         *        an error message is generated.                 *
+         * ----------------------------------------------------- */
+         /* stagesuf = null */
+         stagesuf = "$"
+
+        /* ----------------------------------------------------- *
+         * Stagedsn setting.                                     *
+         * optional.  If used it overrides the permsto and       *
+         *            is always used as the saveto/edit library  *
+         *            by default.  Updates to this library must  *
+         *            then be copied into production later.      *
+         * Note:      Ignored if the dataset does not exist.     *
+         *            Code *WITHOUT* quotes.                     *
+         * ----------------------------------------------------- */
+         /* stagedsn = "sysl.stage.parmlib" */
+         stagedsn = null
+         if stagedsn <> null then do
+            if sysdsn("'"stagedsn"'") <> "OK" then do
+               say "Error: Staging dsn invalid"
+               say "Stagedsn:" stagedsn sysdsn("'"stagedsn"'")
+               stagedsn = null
+               end
+            else do
+                 t.1 = stagedsn
+                 t.0 = parm.0 + 1
+                 do i = 1 to parm.0
+                    i2 = i + 1
+                    t.i2 = parm.i
+                    end
+                 do i = 1 to t.0
+                    parm.i = t.i
+                    end
+                    parm.0 = t.0
+                 end
+            end
+
+        /* ----------------------------------------------------- *
+         * slmpds defines the partitioned dataset into which the *
+         *        locally defined list of libraries will be      *
+         *        stored. If not using user prefix then it only  *
+         *        one person can use the table at a time.....    *
+         * ----------------------------------------------------- */
+         if sysvar('syspref') = null then
+            hlq = sysvar("sysuid")
+         else do
+              if sysvar("syspref") = sysvar("sysuid") then
+                 hlq = sysvar("syspref")
+              else
+                 hlq = sysvar("syspref")"."sysvar("sysuid")
+              end
+         slmpds = "'"hlq".slmpds'"
+
+        /* ----------------------------------------------------- *
+         * permsto defines a permanent installation default for  *
+         *          the save-to library.  Specify the library    *
+         *          concatentation number (e.g. 1)               *
+         *          NOTE: If null then user can change save-to   *
+         * ----------------------------------------------------- */
+         /* permsto = null */
+         permsto = 1
+
+        /* ----------------------------------------------------- *
+         * If stagedsn set then set permsto to 1 regardless      *
+         * ----------------------------------------------------- */
+         if stagedsn <> null then permsto = 1
+
+        /* ----------------------------------------------------- *
+         * End of local customizations                           *
+         * ----------------------------------------------------- */
+         return saveopt "/" savechar1 "/" savechar2 "/" ,
+                stagesuf "/" stagedsn "/" permsto "/" ,
+                slmpds "/" j2proc "/" saveoptu "/" saveloc

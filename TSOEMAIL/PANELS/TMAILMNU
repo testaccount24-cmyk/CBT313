@@ -1,0 +1,46 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ! type(output) intens(high) caps(off) just(asis ) color(white)
+   ¦ type(text) intens(high) caps(off) just(asis ) color(turq)
+)Body
++--------------------------% TSO/E-Mail Option Menu +---------------------------
+%Selection ===>_zcmd
+
+
++              %0¦- Defaults                           %Userid: !ZUSER
++              %1¦- Open Mail                          %Date:   !ZJDATE
++              %2¦- Read current Mail                  %Time:   !ZTIME
++              %3¦- Send a Note                        %Center: !SENDCTR
++              %4¦- Send a File
++              %5¦- Process TSO Mail LOGs
++              %6¦- SAFE Mail Registration
++              %7¦- Nick Name Management
++
++
++   %Defaults: ¦  Set various values related to sending messages.
++   %Open Mail:¦  Receive all outstanding mail and display a selection table
+¦                 of all incoming and outgoing mail messages and files.
++   %Read Mail:¦  Read all currently received mail.
++   %Send a Note:¦Send a message to another user.
++   %Send a File:¦Send a file to another user.
++   %Logs:       ¦Process and Create log data sets for messages.
++   %SAFE Mail:¦  Register for SAFE Mail processing.
++   %Nick Name:¦  Work with nick names in your message directory
++
+)Init
+ .HELP = TMAILH0
+ &sendctr = trans(&sendctr *,*)
+)Proc
+ &zsel = trans(&zcmd
+               0, 'CMD(%TMAILDEF) NEWAPPL(MAIL)'
+               1, 'CMD(%TSOMAIL) NEWAPPL(MAIL)'
+               2, 'CMD(%TSOMAIL READ) NEWAPPL(MAIL)'
+               3, 'CMD(%TMAILSND) NEWAPPL(MAIL)'
+               4, 'CMD(%TMAILSND SENDFILE) NEWAPPL(MAIL)'
+               5, 'CMD(%TMAILLOG) NEWAPPL(MAIL)'
+               6, 'CMD(%TMAILSM)'
+               7, 'CMD(%TMAILNIK) NEWAPPL(MAIL)'
+               )
+)End

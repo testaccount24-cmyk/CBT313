@@ -1,0 +1,39 @@
+)Attr Default(%+_)
+/* % type(text  ) intens(high)              Defaults displayed for */
+/* + type(text  ) intens(low )                   information only  */
+/* _ type( input) intens(high) caps(on ) just(left )               */
+   ¬ type(text) intens(high) caps(off) just(asis ) color(yellow)
+   ! type(text) intens(high) caps(off) just(asis ) color(turq)
+   ¦ type(text  ) intens(high) color(white)
+   ` type(text) intens(low ) caps(off) just(asis ) color(turq)
+)Body
++---------------------------% TSO/E-Mail Tutorial +-----------------------------
+%Command ===>_zcmd
+%
+`      The following mail selection commands may be entered on the
+`      selection bar to the left of each message in the TSO Mail Table
+`      display.  Information on them will be presented in sequence or
+`      selected by number.
+
+¦      1¬(A)¦-!Answer the mail
+¦      2¬(D)¦-!Delete the note
+¦      3¬(E)¦-!Edit the note
+¦      4¬(F)¦-!Forward the note
+¦      5¬(P)¦-!Print the note
+¦      6¬(L)¦-!Log/Archive the message
+¦      7¬(C)¦-!Change the subject and status of a message for clarity
+¦      8¬(M)¦-!Merge the data set associated with message into the message
+¦      9¬(S)¦-!Read the mail or Select the note or process the received File
+`       `File options:  Read, Browse, Copy, Delete,
+`                       Edit, PDS, Print, Rename
+`
+)Init
+)Proc
+  &zsel = trans(&zcmd 1,tmailh2a  2,*tmailh2a  3,*tmail2a 4,tmailh2b
+                      5,*tmailh2b 6,*tmailh2b  7,*tmailh2b
+                      8,tmailh2c  9,tmailh2d
+                      A,tmailh2a  D,*tmailh2a  E,*tmail2a F,tmailh2b
+                      P,*tmailh2b L,*tmailh2b  C,*tmailh2b
+                      M,tmailh2c  S,tmailh2d
+                      *,?)
+)End
